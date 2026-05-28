@@ -100,7 +100,7 @@ export default function InboxParceiro({ params }: { params: Promise<{ lang: stri
       {/* BARRA LATERAL (INBOX) */}
       <div style={{ width: '350px', borderRight: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', backgroundColor: '#f8fafc' }}>
         <div style={{ padding: '1.5rem', borderBottom: '1px solid #e2e8f0', backgroundColor: 'white' }}>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: '900', color: '#0f172a', margin: 0 }}>Inbox Inteligente</h2>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: '900', color: '#0f172a', margin: 0 }}>Mensagens</h2>
           <p style={{ fontSize: '12px', color: '#64748b', fontWeight: 'bold', marginTop: '0.25rem' }}>{conversas.length} Clientes Ativos</p>
         </div>
         <div style={{ overflowY: 'auto', flex: 1 }}>
