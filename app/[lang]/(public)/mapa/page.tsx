@@ -18,7 +18,8 @@ export default async function PaginaMapa({
   const idade = sp?.idade || "";
   const lingua = sp?.lingua || "";
 
-  let query = supabase.from("campos").select("*");
+  // FILTRO APLICADO: Só procura campos com contrato assinado
+  let query = supabase.from("campos").select("*").not("contrato_parceiro_url", "is", null);
 
   if (categoria) query = query.eq("categoria", categoria);
   if (idade) query = query.eq("idade", idade);
@@ -26,8 +27,11 @@ export default async function PaginaMapa({
 
   const { data: campos } = await query;
 
-  // Lógica Inteligente para extrair opções bilíngues da Base de Dados
-  const { data: todosFiltros } = await supabase.from('campos').select('categoria, categoria_en, idade, idade_en, linguas_faladas');
+  // FILTRO APLICADO: Só extrai categorias/idades de campos com contrato assinado
+  const { data: todosFiltros } = await supabase
+    .from('campos')
+    .select('categoria, categoria_en, idade, idade_en, linguas_faladas')
+    .not("contrato_parceiro_url", "is", null);
   
   const categoriasMap = new Map();
   const idadesMap = new Map();
@@ -49,8 +53,6 @@ export default async function PaginaMapa({
   return (
     <main style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 80px)', overflow: 'hidden', backgroundColor: '#f8fafc', fontFamily: 'sans-serif' }}>
       
-      {/* HEADER LOCAL REMOVIDO PARA NÃO DUPLICAR COM O LAYOUT.TSX GLOBAL */}
-
       {/* LAYOUT PRINCIPAL */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         
@@ -104,7 +106,6 @@ export default async function PaginaMapa({
 
         {/* ÁREA DO MAPA */}
         <section style={{ flex: 1, position: 'relative' }}>
-          {/* O componente MapaWrapper mantém-se inalterado */}
           <MapaWrapper campos={campos || []} />
         </section>
 

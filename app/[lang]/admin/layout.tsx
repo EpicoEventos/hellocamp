@@ -62,6 +62,9 @@ export default function AdminLayout({
           <Link href={`/${lang}/admin/dashboard`} style={navStyle(pathname.includes('/dashboard'))}>
             📊 {isEn ? 'Dashboard' : 'Resumo'}
           </Link>
+          <Link href={`/${lang}/admin/inbox`} style={navStyle(pathname.includes('/inbox'))}>
+            💬 {isEn ? 'Inbox' : 'Mensagens'}
+          </Link>
           <Link href={`/${lang}/admin/campos`} style={navStyle(pathname.includes('/campos'))}>
             🏕️ {isEn ? 'My Camps' : 'Os Meus Campos'}
           </Link>

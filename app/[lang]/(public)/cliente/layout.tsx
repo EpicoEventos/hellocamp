@@ -58,6 +58,9 @@ export default function ClienteLayout({
           <Link href={`/${lang}/cliente/dashboard`} style={navStyle(pathname.includes('/dashboard'))}>
             📅 {isEn ? 'Upcoming Camps' : 'Próximos Campos'}
           </Link>
+          <Link href={`/${lang}/cliente/mensagens`} style={navStyle(pathname.includes('/mensagens'))}>
+            💬 {isEn ? 'Messages' : 'Mensagens'}
+          </Link>
           <Link href={`/${lang}/cliente/criancas`} style={navStyle(pathname.includes('/criancas'))}>
             👦 {isEn ? 'My Children' : 'Os Meus Filhos'}
           </Link>
