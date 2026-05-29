@@ -4,11 +4,18 @@ import Stripe from 'stripe';
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
-  // A instância da Stripe só acontece quando o pedido for feito
   const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
   
   if (!stripeSecretKey) {
-    return NextResponse.json({ error: "Servidor mal configurado." }, { status: 500 });
+    // DETETOR DE PROBLEMAS: Vai procurar todas as chaves que a Vercel deixou passar
+    const todasAsChaves = Object.keys(process.env);
+    const chavesDaStripeQueOServidorVe = todasAsChaves.filter(k => k.toLowerCase().includes('stripe'));
+    
+    return NextResponse.json({ 
+      error: "Servidor mal configurado.", 
+      motivo: "A Vercel bloqueou a leitura da chave STRIPE_SECRET_KEY ao servidor.",
+      o_que_o_servidor_consegue_ver: chavesDaStripeQueOServidorVe.length > 0 ? chavesDaStripeQueOServidorVe : "Nenhuma chave com o nome STRIPE foi encontrada pela Vercel!"
+    }, { status: 500 });
   }
 
   const stripe = new Stripe(stripeSecretKey);
@@ -16,7 +23,6 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const { reservasIds, totalAmount, userEmail, lang, campoNome, stripeAccountId } = body;
-
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.hellocamp.pt';
 
     const sessionData: any = {
@@ -53,7 +59,6 @@ export async function POST(req: Request) {
     }
 
     const session = await stripe.checkout.sessions.create(sessionData);
-
     return NextResponse.json({ url: session.url });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
