@@ -141,7 +141,13 @@ export default function CheckoutPage({ params }: { params: Promise<{ lang: strin
       
       const idsCriados = reservasData.map(r => r.id);
 
-      // 2. CONECTAR À API STRIPE PARA PAGAMENTO DIGITAL
+      // SE O PARCEIRO RECEBER DIRETO, O FLUXO TERMINA AQUI.
+      if (organizador?.modelo_pagamento === 'parceiro_recebe') {
+        router.push(`/${lang}/sucesso`);
+        return;
+      }
+
+      // 2. CONECTAR À API STRIPE PARA PAGAMENTO DIGITAL (HelloCamp processa)
       const res = await fetch('/api/stripe/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -182,7 +188,6 @@ export default function CheckoutPage({ params }: { params: Promise<{ lang: strin
         </div>
       )}
 
-      {/* POP-UP MODAL NOVA CRIANÇA */}
       {showModal && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.7)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', backdropFilter: 'blur(4px)' }}>
           <div style={{ backgroundColor: 'white', width: '100%', maxWidth: '500px', borderRadius: '1.5rem', padding: '2.5rem', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', position: 'relative' }}>
@@ -303,16 +308,25 @@ export default function CheckoutPage({ params }: { params: Promise<{ lang: strin
             <section style={{ backgroundColor: 'white', padding: '2.5rem', borderRadius: '1.5rem', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
               <h2 style={{ fontSize: '1.25rem', fontWeight: '800', marginBottom: '1.5rem' }}>{isEn ? 'Secure Payment' : 'Pagamento Seguro'}</h2>
               
-              <div style={{ padding: '1.5rem', backgroundColor: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
-                <div>
-                  <p style={{ fontWeight: 'bold', color: '#0f172a', margin: '0 0 0.5rem 0' }}>Stripe Checkout</p>
-                  <p style={{ fontSize: '13px', color: '#64748b', margin: 0 }}>Pague de forma 100% segura através de MB WAY, Cartão de Crédito ou Débito.</p>
+              {organizador?.modelo_pagamento === 'parceiro_recebe' ? (
+                <div style={{ padding: '1.5rem', backgroundColor: '#f0fdf4', border: '1px solid #059669', borderRadius: '1rem' }}>
+                  <p style={{ fontWeight: 'bold', color: '#064e3b', marginBottom: '0.5rem' }}>Transferência Bancária Direta (Parceiro)</p>
+                  <p style={{ fontSize: '14px', color: '#334155', margin: 0 }}>Entidade: {organizador.empresa_nome}</p>
+                  <p style={{ fontSize: '14px', color: '#334155', margin: 0 }}>IBAN: {organizador.iban}</p>
+                  <p style={{ fontSize: '12px', color: '#64748b', marginTop: '1rem' }}>* A sua reserva ficará pendente. O parceiro irá processar este pagamento diretamente e validar a sua inscrição.</p>
                 </div>
-                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-                  <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/MB_Way.svg/2560px-MB_Way.svg.png" alt="MBWAY" style={{ height: '20px' }} />
-                  <span style={{ fontSize: '24px' }}>💳</span>
+              ) : (
+                <div style={{ padding: '1.5rem', backgroundColor: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+                  <div>
+                    <p style={{ fontWeight: 'bold', color: '#0f172a', margin: '0 0 0.5rem 0' }}>Stripe Checkout</p>
+                    <p style={{ fontSize: '13px', color: '#64748b', margin: 0 }}>Pague de forma 100% segura através de MB WAY, Cartão de Crédito ou Débito.</p>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/MB_Way.svg/2560px-MB_Way.svg.png" alt="MBWAY" style={{ height: '20px' }} />
+                    <span style={{ fontSize: '24px' }}>💳</span>
+                  </div>
                 </div>
-              </div>
+              )}
             </section>
 
             <button type="submit" disabled={processingStripe} style={{ width: '100%', padding: '1.25rem', backgroundColor: '#0f172a', color: 'white', fontSize: '1.125rem', fontWeight: '900', borderRadius: '1rem', border: 'none', cursor: processingStripe ? 'not-allowed' : 'pointer', boxShadow: '0 10px 15px -3px rgba(15, 23, 42, 0.3)', transition: 'transform 0.2s' }}>
