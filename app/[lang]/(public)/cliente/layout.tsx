@@ -50,7 +50,7 @@ export default function ClienteLayout({
             {isEn ? 'Parent Portal' : 'Portal dos Pais'}
           </h2>
           <p style={{ fontSize: '12px', color: '#059669', fontWeight: 'bold', marginTop: '0.25rem' }}>
-            Área Reservada
+            {isEn ? 'Private Area' : 'Área Reservada'}
           </p>
         </div>
         
@@ -66,6 +66,9 @@ export default function ClienteLayout({
           </Link>
           <Link href={`/${lang}/cliente/favoritos`} style={navStyle(pathname.includes('/favoritos'))}>
             ❤️ {isEn ? 'Wishlist' : 'Os Meus Favoritos'}
+          </Link>
+          <Link href={`/${lang}/cliente/perfil`} style={navStyle(pathname.includes('/perfil'))}>
+            🛡️ {isEn ? 'Profile & Security' : 'Perfil e Segurança'}
           </Link>
           <Link href={`/${lang}/pesquisa`} style={{ ...navStyle(false), color: '#0f172a', borderTop: '1px solid #f1f5f9', marginTop: '0.5rem', paddingTop: '1rem' }}>
             🔍 {isEn ? 'Explore Camps' : 'Explorar Campos'}
