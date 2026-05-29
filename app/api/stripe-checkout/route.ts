@@ -4,11 +4,12 @@ import Stripe from 'stripe';
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
-  // ATENÇÃO: Agora vamos usar o nome NOVO que não tem cache fantasma na Vercel!
-  const stripeSecretKey = process.env.MINHA_CHAVE_STRIPE;
+  // Voltamos a ler a chave em segurança a partir da Vercel
+  const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
   
+  // Validação obrigatória para o servidor e para o TypeScript
   if (!stripeSecretKey) {
-    return NextResponse.json({ error: "A Vercel continua a bloquear as chaves de ambiente." }, { status: 500 });
+    return NextResponse.json({ error: "A chave da Stripe não foi encontrada no servidor." }, { status: 500 });
   }
 
   const stripe = new Stripe(stripeSecretKey);
@@ -16,6 +17,8 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const { reservasIds, totalAmount, userEmail, lang, campoNome, stripeAccountId } = body;
+    
+    // Usamos o link do ambiente ou o link principal por segurança
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.hellocamp.pt';
 
     const sessionData: any = {
