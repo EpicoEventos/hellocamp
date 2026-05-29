@@ -4,10 +4,11 @@ import Stripe from 'stripe';
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
-  const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+  // ATENÇÃO: Agora vamos usar o nome NOVO que não tem cache fantasma na Vercel!
+  const stripeSecretKey = process.env.MINHA_CHAVE_STRIPE;
   
   if (!stripeSecretKey) {
-    return NextResponse.json({ error: "Erro interno: A Vercel não carregou a chave da Stripe." }, { status: 500 });
+    return NextResponse.json({ error: "A Vercel continua a bloquear as chaves de ambiente." }, { status: 500 });
   }
 
   const stripe = new Stripe(stripeSecretKey);
@@ -41,10 +42,9 @@ export async function POST(req: Request) {
       },
     };
 
-    // Se o parceiro tiver Stripe ligada, a comissão e transferência são feitas aqui
     if (stripeAccountId) {
       sessionData.payment_intent_data = {
-        application_fee_amount: Math.round((totalAmount * 0.15) * 100), // Comissão
+        application_fee_amount: Math.round((totalAmount * 0.15) * 100), 
         transfer_data: {
           destination: stripeAccountId,
         },
