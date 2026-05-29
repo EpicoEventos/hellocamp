@@ -22,7 +22,7 @@ export async function POST(req: Request) {
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.hellocamp.pt';
 
     const sessionData: any = {
-      payment_method_types: ['card', 'mbway'],
+      payment_method_types: ['card', 'mb_way'],
       customer_email: userEmail,
       line_items: [
         {
