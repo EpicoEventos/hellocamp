@@ -1,7 +1,8 @@
 import Header from "./components/header"; // Ajusta o caminho se necessário
 import Footer from "./components/Footer"; // Ajusta o caminho se necessário
 import { getDictionary } from "../../../lib/getDictionary";
-
+import { Analytics } from "@vercel/analytics/next"
+import { SpeedInsights } from "@vercel/speed-insights/next"
 export default async function PublicLayout({
   children,
   params,
