@@ -7,15 +7,7 @@ export async function POST(req: Request) {
   const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
   
   if (!stripeSecretKey) {
-    // DETETOR DE PROBLEMAS: Vai procurar todas as chaves que a Vercel deixou passar
-    const todasAsChaves = Object.keys(process.env);
-    const chavesDaStripeQueOServidorVe = todasAsChaves.filter(k => k.toLowerCase().includes('stripe'));
-    
-    return NextResponse.json({ 
-      error: "Servidor mal configurado.", 
-      motivo: "A Vercel bloqueou a leitura da chave STRIPE_SECRET_KEY ao servidor.",
-      o_que_o_servidor_consegue_ver: chavesDaStripeQueOServidorVe.length > 0 ? chavesDaStripeQueOServidorVe : "Nenhuma chave com o nome STRIPE foi encontrada pela Vercel!"
-    }, { status: 500 });
+    return NextResponse.json({ error: "Erro interno: A Vercel não carregou a chave da Stripe." }, { status: 500 });
   }
 
   const stripe = new Stripe(stripeSecretKey);
@@ -49,9 +41,10 @@ export async function POST(req: Request) {
       },
     };
 
+    // Se o parceiro tiver Stripe ligada, a comissão e transferência são feitas aqui
     if (stripeAccountId) {
       sessionData.payment_intent_data = {
-        application_fee_amount: Math.round((totalAmount * 0.15) * 100),
+        application_fee_amount: Math.round((totalAmount * 0.15) * 100), // Comissão
         transfer_data: {
           destination: stripeAccountId,
         },
