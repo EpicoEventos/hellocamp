@@ -18,7 +18,6 @@ export default function PesquisaPorPais({ params }: { params: Promise<{ lang: st
 
   useEffect(() => {
     const fetchCamposPorPais = async () => {
-      // FILTRO APLICADO: Só campos com contrato
       const { data, error } = await supabase
         .from("campos")
         .select("*")
@@ -72,12 +71,10 @@ export default function PesquisaPorPais({ params }: { params: Promise<{ lang: st
                 key={campo.id} 
                 style={{ backgroundColor: 'white', borderRadius: '1.25rem', border: '1px solid #e2e8f0', overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)' }}
               >
-                {/* LINK INVISÍVEL COBRE O CARTÃO INTEIRO */}
                 <Link href={`/${lang}/campo/${campo.id}`} style={{ position: 'absolute', inset: 0, zIndex: 10 }}>
-                  <span className="sr-only">Explorar {nomeVisivel}</span>
+                  <span className="sr-only">{isEn ? `Explore ${nomeVisivel}` : `Explorar ${nomeVisivel}`}</span>
                 </Link>
 
-                {/* BOTÃO DO CORAÇÃO FLUTUANTE */}
                 <div style={{ position: 'absolute', top: '1rem', right: '1rem', zIndex: 20 }}>
                   <BotaoFavorito campoId={campo.id} />
                 </div>

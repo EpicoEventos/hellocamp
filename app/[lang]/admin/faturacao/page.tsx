@@ -47,7 +47,6 @@ export default function FaturacaoPage({ params }: { params: Promise<{ lang: stri
     carregarDados();
   }, []);
 
-  // Lógica para ligar ou gerir a conta automática na Stripe
   const handleStripeConnect = async () => {
     setConnectLoading(true);
     try {
@@ -66,12 +65,12 @@ export default function FaturacaoPage({ params }: { params: Promise<{ lang: stri
 
       const data = await response.json();
       if (data.url) {
-        window.location.href = data.url; // Redireciona para o formulário seguro da Stripe
+        window.location.href = data.url; 
       } else {
-        alert("Erro ao conectar com a Stripe: " + data.error);
+        alert((isEn ? "Stripe connection error: " : "Erro ao conectar com a Stripe: ") + data.error);
       }
     } catch (err: any) {
-      alert("Erro técnico: " + err.message);
+      alert((isEn ? "Technical error: " : "Erro técnico: ") + err.message);
     }
     setConnectLoading(false);
   };
@@ -87,7 +86,7 @@ export default function FaturacaoPage({ params }: { params: Promise<{ lang: stri
         nif_empresa: perfil.nif_empresa
       }).eq('id', session.user.id);
       
-      if (error) alert("Erro ao guardar: " + error.message);
+      if (error) alert((isEn ? "Save error: " : "Erro ao guardar: ") + error.message);
       else alert(isEn ? "Company details saved." : "Dados da empresa guardados com sucesso.");
     }
     setSaving(false);
@@ -166,17 +165,18 @@ export default function FaturacaoPage({ params }: { params: Promise<{ lang: stri
         </div>
       </div>
 
-      {/* PAINEL DE CONFIGURAÇÃO DE CONFIGURAÇÃO STRIPE CONNECT */}
       <div style={{ marginBottom: '2.5rem', padding: '2rem', borderRadius: '1rem', backgroundColor: perfil?.stripe_account_id ? '#f0fdf4' : '#f8fafc', border: `1px solid ${perfil?.stripe_account_id ? '#bbf7d0' : '#e2e8f0'}` }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1.5rem' }}>
           <div>
             <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold', color: '#0f172a' }}>
-              {perfil?.stripe_account_id ? '✓ Configuração Bancária Concluída' : '⚠️ Ative os Recebimentos Automáticos'}
+              {perfil?.stripe_account_id 
+                ? (isEn ? '✓ Bank Configuration Completed' : '✓ Configuração Bancária Concluída') 
+                : (isEn ? '⚠️ Enable Automated Payouts' : '⚠️ Ative os Recebimentos Automáticos')}
             </h3>
             <p style={{ margin: '0.5rem 0 0 0', fontSize: '14px', color: '#475569', lineHeight: 1.4 }}>
               {perfil?.stripe_account_id 
-                ? 'A sua conta bancária está vinculada de forma segura através da Stripe. O valor das inscrições (deduzido da comissão) será transferido diretamente para a sua conta.' 
-                : 'Para poder receber os pagamentos das inscrições feitas pelos pais, necessita de associar os seus dados de pagamento à nossa plataforma parceira Stripe.'}
+                ? (isEn ? 'Your bank account is securely linked via Stripe. Booking funds (minus commission) will be transferred directly to your account.' : 'A sua conta bancária está vinculada de forma segura através da Stripe. O valor das inscrições (deduzido da comissão) será transferido diretamente para a sua conta.') 
+                : (isEn ? 'To receive booking payments from parents, you need to link your payment details to our partner platform Stripe.' : 'Para poder receber os pagamentos das inscrições feitas pelos pais, necessita de associar os seus dados de pagamento à nossa plataforma parceira Stripe.')}
             </p>
           </div>
           <button 
@@ -193,7 +193,7 @@ export default function FaturacaoPage({ params }: { params: Promise<{ lang: stri
               fontSize: '14px'
             }}
           >
-            {connectLoading ? 'A processar...' : (perfil?.stripe_account_id ? 'Gerir Conta Stripe' : 'Ligar à Stripe')}
+            {connectLoading ? (isEn ? 'Processing...' : 'A processar...') : (perfil?.stripe_account_id ? (isEn ? 'Manage Stripe Account' : 'Gerir Conta Stripe') : (isEn ? 'Connect to Stripe' : 'Ligar à Stripe'))}
           </button>
         </div>
       </div>
@@ -221,7 +221,6 @@ export default function FaturacaoPage({ params }: { params: Promise<{ lang: stri
 
       <div style={{ display: 'grid', gap: '2rem', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', marginBottom: '2.5rem', alignItems: 'start' }}>
         
-        {/* DADOS FISCAIS DA EMPRESA */}
         <div style={cardStyle}>
           <h2 style={cardTitleStyle}>{isEn ? 'Company Details' : 'Dados Fiscais da Empresa'}</h2>
           <form onSubmit={handleSaveDetails} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -230,16 +229,15 @@ export default function FaturacaoPage({ params }: { params: Promise<{ lang: stri
               <input type="text" value={perfil.empresa_nome || ''} onChange={e => setPerfil({...perfil, empresa_nome: e.target.value})} style={inputStyle} required />
             </div>
             <div>
-              <label style={labelStyle}>NIF</label>
+              <label style={labelStyle}>{isEn ? 'NIF / Tax ID' : 'NIF'}</label>
               <input type="text" value={perfil.nif_empresa || ''} onChange={e => setPerfil({...perfil, nif_empresa: e.target.value})} style={inputStyle} required />
             </div>
             <button type="submit" disabled={saving} style={{ marginTop: '1rem', padding: '1rem', backgroundColor: '#0f172a', color: 'white', fontWeight: '900', borderRadius: '0.5rem', border: 'none', cursor: 'pointer' }}>
-              {saving ? 'A guardar...' : (isEn ? 'Save Details' : 'Gravar Dados Fiscais')}
+              {saving ? (isEn ? 'Saving...' : 'A guardar...') : (isEn ? 'Save Details' : 'Gravar Dados Fiscais')}
             </button>
           </form>
         </div>
 
-        {/* ACORDO DE COMISSÕES */}
         <div style={cardStyle}>
           <h2 style={cardTitleStyle}>
             {filtroCampoId === 'todos' ? (isEn ? 'Your Global Agreement' : 'Acordo de Comissionamento Geral') : (isEn ? 'Camp Agreement' : 'Contrato Deste Campo')}
@@ -247,11 +245,11 @@ export default function FaturacaoPage({ params }: { params: Promise<{ lang: stri
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', flex: 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
               <div style={{ backgroundColor: '#f8fafc', padding: '1.5rem', borderRadius: '0.75rem', border: '1px solid #e2e8f0', textAlign: 'center', minWidth: '120px' }}>
-                <p style={{ fontSize: '11px', color: '#64748b', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '0.5rem' }}>{filtroCampoId === 'todos' ? 'Taxa Base' : 'Taxa do Campo'}</p>
+                <p style={{ fontSize: '11px', color: '#64748b', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '0.5rem' }}>{filtroCampoId === 'todos' ? (isEn ? 'Base Rate' : 'Taxa Base') : (isEn ? 'Camp Rate' : 'Taxa do Campo')}</p>
                 <span style={{ fontSize: '2rem', fontWeight: '900', color: '#059669' }}>{taxaExibida}%</span>
               </div>
               <div>
-                <p style={{ fontSize: '11px', color: '#64748b', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Base de Incidência</p>
+                <p style={{ fontSize: '11px', color: '#64748b', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '0.25rem' }}>{isEn ? 'Incidence Base' : 'Base de Incidência'}</p>
                 <p style={{ fontSize: '14px', color: '#0f172a', fontWeight: 'bold', margin: '0 0 0.5rem 0' }}>
                   {baseExibida === 'apenas_programa' ? (isEn ? 'Base program only (Extras excluded)' : 'Apenas sobre o Programa Base') : (isEn ? 'Total value (Program + Extras)' : 'Sobre Valor Total da Reserva')}
                 </p>
@@ -260,7 +258,7 @@ export default function FaturacaoPage({ params }: { params: Promise<{ lang: stri
 
             {filtroCampoId !== 'todos' && contratoExibido && (
               <a href={contratoExibido} target="_blank" rel="noopener noreferrer" style={{ padding: '1rem', backgroundColor: '#fffbeb', color: '#b45309', borderRadius: '0.5rem', textDecoration: 'none', fontWeight: 'bold', fontSize: '13px', border: '1px solid #fde68a', textAlign: 'center', display: 'block' }}>
-                📥 Descarregar Contrato Validado Pela HelloCamp
+                📥 {isEn ? 'Download Verified Contract' : 'Descarregar Contrato Validado'}
               </a>
             )}
             
@@ -274,7 +272,6 @@ export default function FaturacaoPage({ params }: { params: Promise<{ lang: stri
 
       </div>
 
-      {/* TABELA DE HISTÓRICO */}
       <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '1.25rem', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
         <h2 style={cardTitleStyle}>{isEn ? 'Transaction History' : 'Histórico de Transações e Comissões'}</h2>
         
@@ -313,7 +310,7 @@ export default function FaturacaoPage({ params }: { params: Promise<{ lang: stri
                         backgroundColor: res.status_pagamento === 'Pago' ? '#ecfdf5' : (res.status_pagamento === 'Reembolsado' ? '#fef2f2' : '#fef3c7'),
                         color: res.status_pagamento === 'Pago' ? '#059669' : (res.status_pagamento === 'Reembolsado' ? '#ef4444' : '#b45309')
                       }}>
-                        {res.status_pagamento || 'Pendente'}
+                        {res.status_pagamento === 'Pago' ? (isEn ? 'Paid' : 'Pago') : (res.status_pagamento === 'Reembolsado' ? (isEn ? 'Refunded' : 'Reembolsado') : (isEn ? 'Pending' : 'Pendente'))}
                       </span>
                     </td>
                   </tr>
