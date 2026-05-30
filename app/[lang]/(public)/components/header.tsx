@@ -8,9 +8,10 @@ export default function Header({ dict, lang }: { dict: any, lang: string }) {
       <div className="max-w-[1280px] mx-auto px-4 py-3 md:py-4 md:px-8">
         <div className="flex flex-wrap items-center justify-between">
 
-          {/* 1. LADO ESQUERDO: LOGOTIPO */}
-          <Link href={`/${lang}`} className="text-2xl font-extrabold tracking-tight text-gray-950 no-underline flex-shrink-0">
-            HelloCamp
+          {/* 1. LADO ESQUERDO: LOGOTIPO EM TEXTO PERSONALIZADO */}
+          <Link href={`/${lang}`} className="text-2xl font-extrabold tracking-tight no-underline flex-shrink-0">
+            <span className="text-gray-900">Hello</span>
+            <span className="text-[#C58A24]">Camp</span>
           </Link>
 
           {/* 2. IDIOMA (MOBILE) - Encostado à direita na linha do Logo */}
