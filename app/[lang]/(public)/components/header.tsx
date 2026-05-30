@@ -11,7 +11,8 @@ export default function Header({ dict, lang }: { dict: any, lang: string }) {
           {/* 1. LADO ESQUERDO: LOGOTIPO EM TEXTO PERSONALIZADO */}
           <Link href={`/${lang}`} className="text-2xl font-extrabold tracking-tight no-underline flex-shrink-0">
             <span className="text-gray-900">Hello</span>
-            <span className="text-[#C58A24]">Camp</span>
+            {/* Cor atualizada para um amarelo mais vibrante e luminoso */}
+            <span className="text-[#EBA914]">Camp</span>
           </Link>
 
           {/* 2. IDIOMA (MOBILE) - Encostado à direita na linha do Logo */}
