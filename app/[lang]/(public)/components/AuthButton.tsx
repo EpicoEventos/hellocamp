@@ -55,7 +55,7 @@ export default function AuthButton({ lang, dict }: { lang: string; dict: any }) 
   if (user) {
     return (
       <Link href={`/${lang}/cliente/dashboard`} className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-lg font-bold text-sm no-underline transition whitespace-nowrap">
-        👦 {isEn ? 'Parent Portal' : 'Portal dos Pais'}
+        {isEn ? 'Parent Portal' : 'Portal dos Pais'}
       </Link>
     );
   }

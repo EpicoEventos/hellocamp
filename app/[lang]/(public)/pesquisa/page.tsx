@@ -18,23 +18,23 @@ export default async function PaginaPesquisa({
   const categoria = typeof sp?.categoria === "string" ? sp.categoria : "";
   const distrito = typeof sp?.distrito === "string" ? sp.distrito : "";
   const idade = typeof sp?.idade === "string" ? sp.idade : "";
+  const pais = typeof sp?.pais === "string" ? sp.pais : "";
 
-  // FILTRO APLICADO: Só campos com contrato
   let query = supabase.from("campos").select("*").not("contrato_parceiro_url", "is", null);
 
   if (categoria) query = query.eq("categoria", categoria);
   if (distrito) query = query.ilike("Distrito", `%${distrito}%`);
   if (idade) query = query.eq("idade", idade);
+  if (pais) query = query.or(`pais.ilike.%${pais}%,pais_en.ilike.%${pais}%`);
 
   const { data: resultados } = await query.order("nome");
-  const filtrosAtivos = categoria || distrito || idade;
+  const filtrosAtivos = categoria || distrito || idade || pais;
 
   const distritosPT = ["Aveiro", "Beja", "Braga", "Bragança", "Castelo Branco", "Coimbra", "Évora", "Faro", "Guarda", "Leiria", "Lisboa", "Portalegre", "Porto", "Santarém", "Setúbal", "Viana do Castelo", "Vila Real", "Viseu"];
 
   return (
     <main style={{ minHeight: '100vh', backgroundColor: '#f8fafc', color: '#111827', paddingBottom: '5rem' }}>
       
-      {/* FILTROS HEADER INTERATIVO */}
       <section style={{ backgroundColor: 'white', borderBottom: '1px solid #f1f5f9', padding: '2.5rem 1.5rem', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)' }}>
         <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
           
@@ -48,6 +48,16 @@ export default async function PaginaPesquisa({
           
           <form method="GET" action={`/${lang}/pesquisa`} style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center' }}>
             
+            <select name="pais" defaultValue={pais} style={selectStyle}>
+              <option value="">{isEn ? 'All Countries' : 'Todos os Países'}</option>
+              <option value="Portugal">Portugal</option>
+              <option value="Espanha">{isEn ? 'Spain' : 'Espanha'}</option>
+              <option value="Reino Unido">{isEn ? 'United Kingdom' : 'Reino Unido'}</option>
+              <option value="França">{isEn ? 'France' : 'França'}</option>
+              <option value="Suíça">{isEn ? 'Switzerland' : 'Suíça'}</option>
+              <option value="Itália">{isEn ? 'Italy' : 'Itália'}</option>
+            </select>
+
             <select name="categoria" defaultValue={categoria} style={selectStyle}>
               <option value="">{isEn ? 'All Categories' : 'Todas as Categorias'}</option>
               <option value="Desporto">{isEn ? 'Sports' : 'Desporto'}</option>
@@ -85,7 +95,6 @@ export default async function PaginaPesquisa({
         </div>
       </section>
 
-      {/* RESULTADOS (CARTÕES COM A ESTRUTURA LINK MOBILE) */}
       <section style={{ maxWidth: '1100px', margin: '0 auto', padding: '3.5rem 1.5rem' }}>
         {!resultados || resultados.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '5rem 1.5rem', backgroundColor: 'white', borderRadius: '1.5rem', border: '1px solid #f1f5f9' }}>
@@ -102,12 +111,10 @@ export default async function PaginaPesquisa({
               return (
                 <div key={campo.id} style={{ display: 'flex', flexDirection: 'column', backgroundColor: 'white', overflow: 'hidden', border: '1px solid #e2e8f0', borderRadius: '1.5rem', position: 'relative', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', transition: 'transform 0.2s' }}>
                   
-                  {/* LINK INVISÍVEL COBRE O CARTÃO INTEIRO */}
                   <Link href={`/${lang}/campo/${campo.id}`} style={{ position: 'absolute', inset: 0, zIndex: 10 }}>
                     <span className="sr-only">Explorar {nomeCampo}</span>
                   </Link>
 
-                  {/* BOTÃO DO CORAÇÃO FLUTUANTE */}
                   <div style={{ position: 'absolute', top: '0.75rem', right: '0.75rem', zIndex: 20 }}>
                     <BotaoFavorito campoId={campo.id} />
                   </div>

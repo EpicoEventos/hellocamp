@@ -38,7 +38,7 @@ export default function PerfilPaiPage({ params }: { params: Promise<{ lang: stri
         pessoas_autorizadas_recolha: perfil.pessoas_autorizadas_recolha
       }).eq('id', session.user.id);
       
-      if (error) alert("Erro ao guardar: " + error.message);
+      if (error) alert((isEn ? "Save error: " : "Erro ao guardar: ") + error.message);
       else alert(isEn ? "Profile updated successfully!" : "Os seus dados foram atualizados com sucesso!");
     }
     setSaving(false);
@@ -59,7 +59,6 @@ export default function PerfilPaiPage({ params }: { params: Promise<{ lang: stri
 
       <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
         
-        {/* SECÇÃO 1: DADOS PESSOAIS */}
         <div style={cardStyle}>
           <h2 style={cardTitleStyle}>👤 {isEn ? 'Personal Details' : 'Os Seus Dados (Encarregado de Educação)'}</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem' }}>
@@ -76,13 +75,12 @@ export default function PerfilPaiPage({ params }: { params: Promise<{ lang: stri
               <input type="tel" value={perfil?.telefone || ''} onChange={e => setPerfil({...perfil, telefone: e.target.value})} required style={inputStyle} />
             </div>
             <div>
-              <label style={labelStyle}>NIF (Faturação)</label>
-              <input type="text" value={perfil?.nif || ''} onChange={e => setPerfil({...perfil, nif: e.target.value})} style={inputStyle} placeholder="Para emissão de recibos" />
+              <label style={labelStyle}>{isEn ? 'Tax ID (Billing)' : 'NIF (Faturação)'}</label>
+              <input type="text" value={perfil?.nif || ''} onChange={e => setPerfil({...perfil, nif: e.target.value})} style={inputStyle} placeholder={isEn ? "For receipt issuance" : "Para emissão de recibos"} />
             </div>
           </div>
         </div>
 
-        {/* SECÇÃO 2: SEGURANÇA E EMERGÊNCIA */}
         <div style={{ ...cardStyle, border: '1px solid #fecdd3' }}>
           <h2 style={{ ...cardTitleStyle, color: '#e11d48', borderBottomColor: '#ffe4e6' }}>🛡️ {isEn ? 'Security & Emergency' : 'Segurança e Recolha'}</h2>
           
@@ -90,26 +88,26 @@ export default function PerfilPaiPage({ params }: { params: Promise<{ lang: stri
             <div>
               <label style={{ ...labelStyle, color: '#e11d48' }}>{isEn ? 'Emergency Contact (Name & Phone)' : 'Contacto de Emergência Alternativo (Nome e Telemóvel)'} *</label>
               <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 0.5rem 0' }}>{isEn ? 'Who should we call if we cannot reach you?' : 'A quem deve o campo ligar caso não consiga contactar o encarregado principal?'}</p>
-              <input type="text" value={perfil?.contacto_emergencia || ''} onChange={e => setPerfil({...perfil, contacto_emergencia: e.target.value})} required style={inputStyle} placeholder="Ex: Avó Maria - 912 345 678" />
+              <input type="text" value={perfil?.contacto_emergencia || ''} onChange={e => setPerfil({...perfil, contacto_emergencia: e.target.value})} required style={inputStyle} placeholder={isEn ? "E.g.: Grandma Mary - 912 345 678" : "Ex: Avó Maria - 912 345 678"} />
             </div>
 
             <div>
               <label style={labelStyle}>{isEn ? 'Authorized Pickup Persons' : 'Pessoas Autorizadas a Levantar as Crianças'} *</label>
-              <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 0.5rem 0' }}>{isEn ? 'List names and ID numbers.' : 'Liste os Nomes e números de Cartão de Cidadão das pessoas autorizadas. Por motivos de segurança, os campos podem exigir identificação no local.'}</p>
+              <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 0.5rem 0' }}>{isEn ? 'List names and ID numbers. For security reasons, camps may require identification on site.' : 'Liste os Nomes e números de Cartão de Cidadão das pessoas autorizadas. Por motivos de segurança, os campos podem exigir identificação no local.'}</p>
               <textarea 
                 rows={3} 
                 value={perfil?.pessoas_autorizadas_recolha || ''} 
                 onChange={e => setPerfil({...perfil, pessoas_autorizadas_recolha: e.target.value})} 
                 required 
                 style={{ ...inputStyle, resize: 'vertical' }} 
-                placeholder="Ex: João Silva (Pai) - CC: 12345678, Avó Margarida - CC: 87654321" 
+                placeholder={isEn ? "E.g.: John Doe (Father) - ID: 12345678, Grandma Mary - ID: 87654321" : "Ex: João Silva (Pai) - CC: 12345678, Avó Margarida - CC: 87654321"} 
               />
             </div>
           </div>
         </div>
 
         <button type="submit" disabled={saving} style={{ padding: '1.25rem', backgroundColor: '#0f172a', color: 'white', fontWeight: '900', borderRadius: '0.75rem', border: 'none', cursor: 'pointer', fontSize: '16px', boxShadow: '0 10px 15px -3px rgba(15, 23, 42, 0.2)' }}>
-          {saving ? 'A guardar...' : (isEn ? 'Save Profile' : 'Guardar Alterações')}
+          {saving ? (isEn ? 'Saving...' : 'A guardar...') : (isEn ? 'Save Profile' : 'Guardar Alterações')}
         </button>
       </form>
     </main>
