@@ -1,34 +1,54 @@
+"use client";
+
+import { useEffect, useState, use } from "react";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
-import { getDictionary } from "@/lib/getDictionary";
 import BotaoFavorito from "../components/BotaoFavorito";
+import { useSearchParams } from "next/navigation";
+import React from "react";
 
-export default async function PaginaPesquisa({
+export default function PaginaPesquisa({
   params,
-  searchParams,
 }: {
   params: Promise<{ lang: string }>;
-  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const { lang } = await params;
-  const dict = await getDictionary(lang as "pt" | "en");
-  const sp = await searchParams;
+  const { lang } = use(params);
   const isEn = lang === 'en';
+  const searchParams = useSearchParams();
+
+  // Capturar os filtros ativos no URL
+  const catParam = searchParams.get("categoria") || "";
+  const distParam = searchParams.get("distrito") || "";
+  const idadeParam = searchParams.get("idade") || "";
+  const paisParam = searchParams.get("pais") || "";
+
+  // Estado para controlar o que o utilizador está a selecionar AGORA (antes de aplicar)
+  const [paisUI, setPaisUI] = useState(paisParam);
   
-  const categoria = typeof sp?.categoria === "string" ? sp.categoria : "";
-  const distrito = typeof sp?.distrito === "string" ? sp.distrito : "";
-  const idade = typeof sp?.idade === "string" ? sp.idade : "";
-  const pais = typeof sp?.pais === "string" ? sp.pais : "";
+  // Lógica de Ocultação: Só mostra distritos se o país for Portugal ou se estiver vazio (todos)
+  const mostrarDistritos = paisUI === "" || paisUI === "Portugal";
 
-  let query = supabase.from("campos").select("*").not("contrato_parceiro_url", "is", null);
+  const [resultados, setResultados] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  if (categoria) query = query.eq("categoria", categoria);
-  if (distrito) query = query.ilike("Distrito", `%${distrito}%`);
-  if (idade) query = query.eq("idade", idade);
-  if (pais) query = query.or(`pais.ilike.%${pais}%,pais_en.ilike.%${pais}%`);
+  const filtrosAtivos = catParam || distParam || idadeParam || paisParam;
 
-  const { data: resultados } = await query.order("nome");
-  const filtrosAtivos = categoria || distrito || idade || pais;
+  useEffect(() => {
+    const fetchResultados = async () => {
+      setLoading(true);
+      let query = supabase.from("campos").select("*").not("contrato_parceiro_url", "is", null);
+
+      if (catParam) query = query.eq("categoria", catParam);
+      if (distParam && mostrarDistritos) query = query.ilike("Distrito", `%${distParam}%`);
+      if (idadeParam) query = query.eq("idade", idadeParam);
+      if (paisParam) query = query.or(`pais.ilike.%${paisParam}%,pais_en.ilike.%${paisParam}%`);
+
+      const { data } = await query.order("nome");
+      setResultados(data || []);
+      setLoading(false);
+    };
+    fetchResultados();
+  }, [catParam, distParam, idadeParam, paisParam, mostrarDistritos]);
 
   const distritosPT = ["Aveiro", "Beja", "Braga", "Bragança", "Castelo Branco", "Coimbra", "Évora", "Faro", "Guarda", "Leiria", "Lisboa", "Portalegre", "Porto", "Santarém", "Setúbal", "Viana do Castelo", "Vila Real", "Viseu"];
 
@@ -39,16 +59,21 @@ export default async function PaginaPesquisa({
         <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
           
           <Link href={`/${lang}`} style={{ display: 'inline-block', marginBottom: '1.5rem', fontSize: '13px', fontWeight: 'bold', color: '#64748b', textDecoration: 'none' }}>
-            &larr; {dict.pesquisa.voltar}
+            &larr; {isEn ? 'Back to Home' : 'Voltar ao Início'}
           </Link>
 
           <h1 style={{ fontSize: '1.875rem', fontWeight: '900', color: '#0f172a', marginBottom: '1.5rem' }}>
-            {filtrosAtivos ? dict.pesquisa.resultados : dict.pesquisa.todos}
+            {filtrosAtivos ? (isEn ? 'Search Results' : 'Resultados da Pesquisa') : (isEn ? 'All Camps' : 'Todos os Campos')}
           </h1>
           
           <form method="GET" action={`/${lang}/pesquisa`} style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center' }}>
             
-            <select name="pais" defaultValue={pais} style={selectStyle}>
+            <select 
+              name="pais" 
+              value={paisUI} 
+              onChange={(e) => setPaisUI(e.target.value)} 
+              style={selectStyle}
+            >
               <option value="">{isEn ? 'All Countries' : 'Todos os Países'}</option>
               <option value="Portugal">Portugal</option>
               <option value="Espanha">{isEn ? 'Spain' : 'Espanha'}</option>
@@ -58,7 +83,7 @@ export default async function PaginaPesquisa({
               <option value="Itália">{isEn ? 'Italy' : 'Itália'}</option>
             </select>
 
-            <select name="categoria" defaultValue={categoria} style={selectStyle}>
+            <select name="categoria" defaultValue={catParam} style={selectStyle}>
               <option value="">{isEn ? 'All Categories' : 'Todas as Categorias'}</option>
               <option value="Desporto">{isEn ? 'Sports' : 'Desporto'}</option>
               <option value="Aventura & Natureza">{isEn ? 'Adventure & Nature' : 'Aventura & Natureza'}</option>
@@ -67,14 +92,17 @@ export default async function PaginaPesquisa({
               <option value="Línguas">{isEn ? 'Languages' : 'Línguas'}</option>
             </select>
 
-            <select name="distrito" defaultValue={distrito} style={selectStyle}>
-              <option value="">{isEn ? 'All Districts' : 'Todos os Distritos'}</option>
-              {distritosPT.map(d => (
-                <option key={d} value={d}>{d}</option>
-              ))}
-            </select>
+            {/* SE O PAÍS NÃO FOR PORTUGAL, ESTE DROPDOWN É REMOVIDO DO ECRÃ AUTOMATICAMENTE */}
+            {mostrarDistritos && (
+              <select name="distrito" defaultValue={distParam} style={selectStyle}>
+                <option value="">{isEn ? 'All Districts' : 'Todos os Distritos'}</option>
+                {distritosPT.map(d => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+            )}
 
-            <select name="idade" defaultValue={idade} style={selectStyle}>
+            <select name="idade" defaultValue={idadeParam} style={selectStyle}>
               <option value="">{isEn ? 'All Ages' : 'Todas as Idades'}</option>
               <option value="6-9 anos">{isEn ? '6-9 years' : '6-9 anos'}</option>
               <option value="10-13 anos">{isEn ? '10-13 years' : '10-13 anos'}</option>
@@ -96,23 +124,27 @@ export default async function PaginaPesquisa({
       </section>
 
       <section style={{ maxWidth: '1100px', margin: '0 auto', padding: '3.5rem 1.5rem' }}>
-        {!resultados || resultados.length === 0 ? (
+        {loading ? (
+           <div style={{ textAlign: 'center', padding: '5rem 1.5rem' }}>
+              <p style={{ fontSize: '1.25rem', color: '#64748b', fontWeight: 'bold' }}>{isEn ? 'Loading...' : 'A carregar...'}</p>
+           </div>
+        ) : (!resultados || resultados.length === 0) ? (
           <div style={{ textAlign: 'center', padding: '5rem 1.5rem', backgroundColor: 'white', borderRadius: '1.5rem', border: '1px solid #f1f5f9' }}>
-            <p style={{ fontSize: '1.25rem', color: '#64748b' }}>{dict.pesquisa.sem_resultados}</p>
+            <p style={{ fontSize: '1.25rem', color: '#64748b', fontWeight: 'bold' }}>{isEn ? 'No results found.' : 'Sem resultados.'}</p>
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '2rem' }}>
             {resultados.map((campo: any) => {
-              const nomeCampo = lang === 'en' && campo.nome_en ? campo.nome_en : campo.nome;
-              const catCampo = lang === 'en' && campo.categoria_en ? campo.categoria_en : campo.categoria;
-              const localCampo = lang === 'en' && campo.local_en ? campo.local_en : (campo.Distrito || campo.local);
-              const idadeCampo = lang === 'en' && campo.idade_en ? campo.idade_en : campo.idade;
+              const nomeCampo = isEn && campo.nome_en ? campo.nome_en : campo.nome;
+              const catCampo = isEn && campo.categoria_en ? campo.categoria_en : campo.categoria;
+              const localCampo = isEn && campo.local_en ? campo.local_en : (campo.Distrito || campo.local);
+              const idadeCampo = isEn && campo.idade_en ? campo.idade_en : campo.idade;
 
               return (
                 <div key={campo.id} style={{ display: 'flex', flexDirection: 'column', backgroundColor: 'white', overflow: 'hidden', border: '1px solid #e2e8f0', borderRadius: '1.5rem', position: 'relative', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', transition: 'transform 0.2s' }}>
                   
                   <Link href={`/${lang}/campo/${campo.id}`} style={{ position: 'absolute', inset: 0, zIndex: 10 }}>
-                    <span className="sr-only">Explorar {nomeCampo}</span>
+                    <span className="sr-only">{isEn ? 'Explore' : 'Explorar'} {nomeCampo}</span>
                   </Link>
 
                   <div style={{ position: 'absolute', top: '0.75rem', right: '0.75rem', zIndex: 20 }}>
@@ -133,12 +165,12 @@ export default async function PaginaPesquisa({
                     <h3 style={{ marginTop: '0.5rem', fontSize: '1.25rem', fontWeight: '800', color: '#0f172a', lineHeight: 1.3 }}>{nomeCampo}</h3>
                     
                     <p style={{ marginTop: '0.5rem', fontSize: '14px', color: '#64748b', fontWeight: '500' }}>
-                      {dict.pesquisa.idade}: <span style={{ color: '#0f172a' }}>{idadeCampo}</span>
+                      {isEn ? 'Age' : 'Idade'}: <span style={{ color: '#0f172a' }}>{idadeCampo}</span>
                     </p>
                     
                     <div style={{ marginTop: 'auto', paddingTop: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid #f1f5f9' }}>
                       <p style={{ fontSize: '1.5rem', fontWeight: '900', color: '#059669', margin: 0 }}>{campo.preco}€</p>
-                      <span style={{ fontSize: '14px', fontWeight: '700', color: '#f59e0b' }}>{dict.pesquisa.explorar} &rarr;</span>
+                      <span style={{ fontSize: '14px', fontWeight: '700', color: '#f59e0b' }}>{isEn ? 'Explore' : 'Explorar'} &rarr;</span>
                     </div>
                   </div>
                 </div>

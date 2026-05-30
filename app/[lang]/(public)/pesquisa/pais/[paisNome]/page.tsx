@@ -18,10 +18,14 @@ export default function PesquisaPorPais({ params }: { params: Promise<{ lang: st
   // Estados dos Filtros
   const [paisSelecionado, setPaisSelecionado] = useState(nomePaisInicial);
   const [categoriaSelecionada, setCategoriaSelecionada] = useState("");
+  const [distritoSelecionado, setDistritoSelecionado] = useState("");
   const [idadeSelecionada, setIdadeSelecionada] = useState("");
 
   const [campos, setCampos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Lógica de Ocultação: Se não for Portugal, escondemos os Distritos
+  const mostrarDistritos = paisSelecionado === "Portugal" || paisSelecionado === "";
 
   useEffect(() => {
     const fetchCampos = async () => {
@@ -37,6 +41,9 @@ export default function PesquisaPorPais({ params }: { params: Promise<{ lang: st
       if (categoriaSelecionada) {
         query = query.eq("categoria", categoriaSelecionada);
       }
+      if (distritoSelecionado && mostrarDistritos) {
+        query = query.ilike("Distrito", `%${distritoSelecionado}%`);
+      }
       if (idadeSelecionada) {
         query = query.eq("idade", idadeSelecionada);
       }
@@ -50,14 +57,22 @@ export default function PesquisaPorPais({ params }: { params: Promise<{ lang: st
     };
 
     fetchCampos();
-  }, [paisSelecionado, categoriaSelecionada, idadeSelecionada]);
+  }, [paisSelecionado, categoriaSelecionada, distritoSelecionado, idadeSelecionada, mostrarDistritos]);
 
-  // Sincroniza a alteração de país com a barra de endereço (SEO e partilha)
+  // Atualiza o País e muda o URL para manter SEO e Partilha
   const handlePaisChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const novoPais = e.target.value;
     setPaisSelecionado(novoPais);
+    
+    // Se mudou para um país estrangeiro, limpamos o distrito da memória para não viciar a pesquisa
+    if (novoPais !== "Portugal" && novoPais !== "") {
+      setDistritoSelecionado(""); 
+    }
+    
     router.replace(`/${lang}/pesquisa/${encodeURIComponent(novoPais)}`);
   };
+
+  const distritosPT = ["Aveiro", "Beja", "Braga", "Bragança", "Castelo Branco", "Coimbra", "Évora", "Faro", "Guarda", "Leiria", "Lisboa", "Portalegre", "Porto", "Santarém", "Setúbal", "Viana do Castelo", "Vila Real", "Viseu"];
 
   return (
     <main style={{ minHeight: '100vh', backgroundColor: '#f8fafc', color: '#111827', paddingBottom: '5rem' }}>
@@ -97,6 +112,16 @@ export default function PesquisaPorPais({ params }: { params: Promise<{ lang: st
               <option value="Línguas">{isEn ? 'Languages' : 'Línguas'}</option>
             </select>
 
+            {/* OCULTA DINAMICAMENTE */}
+            {mostrarDistritos && (
+              <select value={distritoSelecionado} onChange={(e) => setDistritoSelecionado(e.target.value)} style={selectStyle}>
+                <option value="">{isEn ? 'All Districts' : 'Todos os Distritos'}</option>
+                {distritosPT.map(d => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+            )}
+
             <select value={idadeSelecionada} onChange={(e) => setIdadeSelecionada(e.target.value)} style={selectStyle}>
               <option value="">{isEn ? 'All Ages' : 'Todas as Idades'}</option>
               <option value="6-9 anos">{isEn ? '6-9 years' : '6-9 anos'}</option>
@@ -104,8 +129,11 @@ export default function PesquisaPorPais({ params }: { params: Promise<{ lang: st
               <option value="14-17 anos">{isEn ? '14-17 years' : '14-17 anos'}</option>
             </select>
 
-            {(categoriaSelecionada || idadeSelecionada) && (
-              <button onClick={() => { setCategoriaSelecionada(''); setIdadeSelecionada(''); }} style={{ background: 'none', border: 'none', fontSize: '13px', fontWeight: 'bold', color: '#dc2626', cursor: 'pointer', marginLeft: '0.5rem' }}>
+            {(categoriaSelecionada || distritoSelecionado || idadeSelecionada) && (
+              <button 
+                onClick={() => { setCategoriaSelecionada(''); setDistritoSelecionado(''); setIdadeSelecionada(''); }} 
+                style={{ background: 'none', border: 'none', fontSize: '13px', fontWeight: 'bold', color: '#dc2626', cursor: 'pointer', marginLeft: '0.5rem' }}
+              >
                 {isEn ? 'Clear filters' : 'Limpar filtros'}
               </button>
             )}
@@ -130,7 +158,7 @@ export default function PesquisaPorPais({ params }: { params: Promise<{ lang: st
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '2rem' }}>
             {campos.map((campo) => {
               const nomeVisivel = isEn && campo.nome_en ? campo.nome_en : campo.nome;
-              const localVisivel = isEn && campo.local_en ? campo.local_en : campo.local;
+              const localVisivel = isEn && campo.local_en ? campo.local_en : (campo.Distrito || campo.local);
 
               return (
                 <div 
