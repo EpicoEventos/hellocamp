@@ -39,53 +39,55 @@ export default function ClienteLayout({
     router.push(`/${lang}`);
   };
 
-  if (loading) return <div style={{ minHeight: '80vh', backgroundColor: '#f8fafc' }} />;
+  if (loading) return <div className="min-h-[80vh] bg-slate-50" />;
 
   return (
-    <div style={{ display: 'flex', backgroundColor: '#f8fafc', fontFamily: 'sans-serif', minHeight: 'calc(100vh - 80px)' }}>
+    <div className="flex flex-col md:flex-row bg-slate-50 font-sans min-h-[calc(100vh-80px)]">
       
-      <aside style={{ width: '260px', backgroundColor: '#ffffff', borderRight: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ padding: '1.5rem', borderBottom: '1px solid #e2e8f0' }}>
-          <h2 style={{ fontSize: '1.125rem', fontWeight: '900', margin: 0, color: '#0f172a' }}>
+      {/* MENU DE NAVEGAÇÃO: Topo com scroll no mobile, Lateral fixa no Desktop */}
+      <aside className="w-full md:w-[260px] bg-white border-b md:border-b-0 md:border-r border-slate-200 flex flex-col flex-shrink-0">
+        
+        {/* Título: Visível apenas no Desktop para poupar espaço no mobile */}
+        <div className="p-6 border-b border-slate-200 hidden md:block">
+          <h2 className="text-lg font-black m-0 text-slate-900">
             {isEn ? 'Parent Portal' : 'Portal dos Pais'}
           </h2>
-          <p style={{ fontSize: '12px', color: '#059669', fontWeight: 'bold', marginTop: '0.25rem' }}>
+          <p className="text-xs text-emerald-600 font-bold mt-1">
             {isEn ? 'Private Area' : 'Área Reservada'}
           </p>
         </div>
         
-        <nav style={{ flex: 1, padding: '1.5rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          <Link href={`/${lang}/cliente/dashboard`} style={navStyle(pathname.includes('/dashboard'))}>
-            📅 {isEn ? 'Upcoming Camps' : 'Próximos Campos'}
-          </Link>
-          <Link href={`/${lang}/cliente/mensagens`} style={navStyle(pathname.includes('/mensagens'))}>
-            💬 {isEn ? 'Messages' : 'Mensagens'}
-          </Link>
-          <Link href={`/${lang}/cliente/criancas`} style={navStyle(pathname.includes('/criancas'))}>
-            👦 {isEn ? 'My Children' : 'Os Meus Filhos'}
-          </Link>
-          <Link href={`/${lang}/cliente/favoritos`} style={navStyle(pathname.includes('/favoritos'))}>
-            ❤️ {isEn ? 'Wishlist' : 'Os Meus Favoritos'}
-          </Link>
-          <Link href={`/${lang}/cliente/perfil`} style={navStyle(pathname.includes('/perfil'))}>
-            🛡️ {isEn ? 'Profile & Security' : 'Perfil e Segurança'}
-          </Link>
-          <Link href={`/${lang}/pesquisa`} style={{ ...navStyle(false), color: '#0f172a', borderTop: '1px solid #f1f5f9', marginTop: '0.5rem', paddingTop: '1rem' }}>
-            🔍 {isEn ? 'Explore Camps' : 'Explorar Campos'}
-          </Link>
+        {/* Links: Scroll horizontal no mobile (flex-row), Vertical no desktop (md:flex-col) */}
+        <nav className="flex md:flex-col overflow-x-auto md:overflow-visible gap-2 p-3 md:p-6 no-scrollbar scroll-smooth">
+          <NavLink href={`/${lang}/cliente/dashboard`} active={pathname.includes('/dashboard')} icon="📅" text={isEn ? 'Upcoming Camps' : 'Próximos Campos'} />
+          <NavLink href={`/${lang}/cliente/mensagens`} active={pathname.includes('/mensagens')} icon="💬" text={isEn ? 'Messages' : 'Mensagens'} />
+          <NavLink href={`/${lang}/cliente/criancas`} active={pathname.includes('/criancas')} icon="👦" text={isEn ? 'My Children' : 'Os Meus Filhos'} />
+          <NavLink href={`/${lang}/cliente/favoritos`} active={pathname.includes('/favoritos')} icon="❤️" text={isEn ? 'Wishlist' : 'Os Meus Favoritos'} />
+          <NavLink href={`/${lang}/cliente/perfil`} active={pathname.includes('/perfil')} icon="🛡️" text={isEn ? 'Profile & Security' : 'Perfil e Segurança'} />
+          
+          <div className="hidden md:block border-t border-slate-100 my-2 pt-4" />
+          
+          <NavLink href={`/${lang}/pesquisa`} active={false} icon="🔍" text={isEn ? 'Explore Camps' : 'Explorar Campos'} className="md:mt-auto" />
+          
+          {/* Botão de Logout versão Mobile (escondido no PC) */}
+          <button onClick={handleLogout} className="md:hidden flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold text-red-600 bg-red-50 hover:bg-red-100 whitespace-nowrap ml-2">
+            {isEn ? 'Logout' : 'Sair'}
+          </button>
         </nav>
 
-        <div style={{ padding: '1.5rem', borderTop: '1px solid #e2e8f0' }}>
-          <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '1rem', wordBreak: 'break-all' }}>
+        {/* Info Utilizador & Logout versão Desktop (escondido no Mobile) */}
+        <div className="p-6 border-t border-slate-200 hidden md:block">
+          <p className="text-xs text-slate-500 mb-4 break-all">
             {user?.email}
           </p>
-          <button onClick={handleLogout} style={{ width: '100%', padding: '0.75rem', backgroundColor: '#f1f5f9', border: 'none', color: '#dc2626', borderRadius: '0.5rem', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' }}>
+          <button onClick={handleLogout} className="w-full p-3 bg-slate-100 border-none text-red-600 rounded-lg cursor-pointer font-bold text-sm hover:bg-red-50 transition-colors">
             {isEn ? 'Logout' : 'Terminar Sessão'}
           </button>
         </div>
       </aside>
 
-      <main style={{ flex: 1, padding: '2rem', overflowY: 'auto' }}>
+      {/* ÁREA DE CONTEÚDO */}
+      <main className="flex-1 p-4 md:p-8 overflow-y-auto w-full">
         {children}
       </main>
 
@@ -93,14 +95,19 @@ export default function ClienteLayout({
   );
 }
 
-const navStyle = (isActive: boolean): React.CSSProperties => ({
-  display: 'block',
-  padding: '0.875rem 1rem',
-  borderRadius: '0.5rem',
-  backgroundColor: isActive ? '#f1f5f9' : 'transparent',
-  color: isActive ? '#0f172a' : '#475569',
-  fontWeight: isActive ? 'bold' : '500',
-  textDecoration: 'none',
-  fontSize: '14px',
-  transition: 'background-color 0.2s'
-});
+// Componente auxiliar para os botões ficarem limpos e responsivos
+function NavLink({ href, active, icon, text, className = "" }: { href: string, active: boolean, icon: string, text: string, className?: string }) {
+  return (
+    <Link 
+      href={href} 
+      className={`
+        flex items-center gap-2 px-4 py-2.5 md:py-3 rounded-full md:rounded-lg text-sm whitespace-nowrap transition-colors flex-shrink-0
+        ${active ? 'bg-slate-100 text-slate-900 font-bold' : 'text-slate-600 font-medium hover:bg-slate-50 hover:text-slate-900'}
+        ${className}
+      `}
+    >
+      <span>{icon}</span>
+      <span>{text}</span>
+    </Link>
+  );
+}

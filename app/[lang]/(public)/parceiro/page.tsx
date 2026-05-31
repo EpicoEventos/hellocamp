@@ -1,32 +1,117 @@
-export default async function Parceiro({ params }: { params: Promise<{ lang: string }> }) {
+import { Metadata } from 'next';
+import React from 'react';
+
+// 1. OTIMIZAÇÃO SEO B2B (Focado em angariação de parceiros)
+export async function generateMetadata({ params }: { params: Promise<{ lang: string }> }): Promise<Metadata> {
   const { lang } = await params;
-  
+  const isEn = lang === 'en';
+
+  return {
+    title: isEn ? 'Become a Partner | HelloCamp' : 'Junte-se como Parceiro | HelloCamp',
+    description: isEn 
+      ? 'Join HelloCamp, the leading holiday camp marketplace in Portugal. Increase your bookings, reach thousands of parents, and manage registrations, payments, and shifts seamlessly in one dashboard.'
+      : 'Junte-se à HelloCamp, o maior marketplace e plataforma de gestão de campos de férias em Portugal. Aumente as suas reservas, alcance milhares de pais e simplifique a gestão de inscrições e pagamentos.',
+    openGraph: {
+      title: isEn ? 'Grow your Holiday Camp with HelloCamp' : 'Aumente as reservas do seu Campo de Férias',
+      description: isEn ? 'The all-in-one platform for camp organizers.' : 'A plataforma tudo-em-um para organizadores de campos de férias.',
+    }
+  };
+}
+
+export default async function ParceirosLandingPage({ params }: { params: Promise<{ lang: string }> }) {
+  const { lang } = await params;
+  const isEn = lang === 'en';
+
   return (
-    <main style={{ minHeight: '100vh', backgroundColor: '#f8fafc', fontFamily: 'sans-serif', paddingBottom: '5rem' }}>
-      <div style={{ backgroundColor: '#0f172a', padding: '5rem 1.5rem', textAlign: 'center' }}>
-        <h1 style={{ fontSize: '2.5rem', fontWeight: '900', color: 'white' }}>{lang === 'en' ? 'Join HelloCamp' : 'Junte-se ao HelloCamp'}</h1>
-        <p style={{ marginTop: '1rem', color: '#94a3b8', fontSize: '1.125rem' }}>{lang === 'en' ? 'Increase your bookings and simplify management.' : 'Aumente as suas reservas e simplifique a gestão.'}</p>
-      </div>
+    <main className="min-h-screen bg-slate-50 font-sans pb-20">
       
-      <div style={{ maxWidth: '800px', margin: '-3rem auto 0 auto', padding: '0 1.5rem', position: 'relative', zIndex: 10 }}>
-        <div style={{ backgroundColor: 'white', borderRadius: '1.5rem', padding: '3rem', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.05)', color: '#334155', lineHeight: '1.8' }}>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: '800', color: '#0f172a', marginBottom: '1rem' }}>{lang === 'en' ? 'Why become a partner?' : 'Porquê tornar-se parceiro?'}</h2>
-          <p style={{ marginBottom: '2rem' }}>{lang === 'en' ? 'HelloCamp is more than a directory. It is a platform that puts your summer camp in front of thousands of parents actively looking for school break solutions. By joining us, you gain premium visibility and access to simplified booking tools.' : 'O HelloCamp é mais do que um diretório. É uma plataforma que coloca o seu campo de férias à frente de milhares de pais que procuram ativamente soluções para as pausas escolares. Ao juntar-se a nós, ganha visibilidade premium e acesso a ferramentas simplificadas de reserva.'}</p>
+      {/* HEADER ESCURO (HERO SECTION) */}
+      <section className="bg-slate-900 text-white pt-20 pb-32 px-6 text-center">
+        <div className="max-w-3xl mx-auto">
+          <h1 className="text-4xl md:text-5xl font-black mb-4 tracking-tight">
+            {isEn ? 'Join Hello' : 'Junte-se à Hello'}<span className="text-[#EBA914]">Camp</span>
+          </h1>
+          <p className="text-lg md:text-xl text-slate-400 font-medium">
+            {isEn 
+              ? 'Increase your bookings, gain premium visibility, and simplify your management.' 
+              : 'Aumente as suas reservas, ganhe visibilidade premium e simplifique a gestão.'}
+          </p>
+        </div>
+      </section>
+
+      {/* CARTÃO BRANCO SOBREPOSTO (DESIGN EDITORIAL E MINIMALISTA) */}
+      <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 -mt-20">
+        <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/50 p-8 md:p-12 border border-slate-100">
           
-          <ul style={{ paddingLeft: '1.5rem', marginBottom: '2rem', color: '#475569' }}>
-            <li>{lang === 'en' ? 'Visibility focused on your target audience.' : 'Visibilidade focada no seu público-alvo.'}</li>
-            <li>{lang === 'en' ? 'Secure payment and booking processing.' : 'Processamento seguro de pagamentos e reservas.'}</li>
-            <li>{lang === 'en' ? 'Dedicated technical support.' : 'Suporte técnico dedicado.'}</li>
-            <li>{lang === 'en' ? 'Autonomy to manage sessions, spots, and prices.' : 'Autonomia para gerir turnos, vagas e preços.'}</li>
+          <h2 className="text-2xl md:text-3xl font-extrabold text-slate-900 mb-6">
+            {isEn ? 'Why become a partner?' : 'Porquê tornar-se parceiro?'}
+          </h2>
+          
+          <p className="text-slate-600 text-base md:text-lg leading-relaxed mb-10">
+            {isEn 
+              ? 'HelloCamp is more than a directory. It is a SaaS platform that places your holiday camp in front of thousands of parents actively looking for school break solutions. By joining us, you gain access to automated booking and financial tools.'
+              : 'A HelloCamp é mais do que um diretório. É uma plataforma que coloca o seu campo de férias à frente de milhares de pais que procuram ativamente soluções para as pausas escolares. Ao juntar-se a nós, ganha visibilidade premium e acesso a um Dashboard completo de gestão de negócio.'}
+          </p>
+
+          {/* LISTA FORMATADA COM ÍCONES (SUBSTITUI O TEXTO DESCONFIGURADO) */}
+          <ul className="space-y-5 mb-12">
+            <ListItem 
+              title={isEn ? 'Targeted Visibility' : 'Visibilidade Focada'} 
+              desc={isEn ? 'Reach your exact target audience without spending on ads.' : 'Alcance o seu público-alvo exato de forma qualificada.'} 
+            />
+            <ListItem 
+              title={isEn ? 'Automated Payments' : 'Processamento Seguro'} 
+              desc={isEn ? 'Secure payment processing and automated invoicing via Stripe.' : 'Processamento automático de pagamentos e reservas via Stripe.'} 
+            />
+            <ListItem 
+              title={isEn ? 'Total Autonomy' : 'Autonomia Total'} 
+              desc={isEn ? 'Manage your own capacities, shifts, and prices in real-time.' : 'Controlo absoluto para gerir turnos, vagas, extras e preços.'} 
+            />
+            <ListItem 
+              title={isEn ? 'Dedicated Support' : 'Suporte Técnico Dedicado'} 
+              desc={isEn ? 'We help you set up and scale your business on our platform.' : 'Ajudamos a configurar e a otimizar a sua presença na plataforma.'} 
+            />
           </ul>
 
-          <div style={{ backgroundColor: '#fff7ed', padding: '2rem', borderRadius: '1rem', border: '1px solid #ffedd5', textAlign: 'center' }}>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: '800', color: '#9a3412', marginBottom: '1rem' }}>{lang === 'en' ? 'Ready to start?' : 'Pronto para começar?'}</h3>
-            <p style={{ color: '#c2410c', marginBottom: '1.5rem', fontSize: '14px' }}>{lang === 'en' ? 'Send us an email with your company details and we will contact you within 24 hours.' : 'Envie-nos um email com os dados da sua empresa e entraremos em contacto em 24 horas.'}</p>
-            <a href="mailto:info@hellocamp.pt" style={{ display: 'inline-block', backgroundColor: '#de5d25', color: 'white', fontWeight: 'bold', padding: '1rem 2rem', borderRadius: '999px', textDecoration: 'none' }}>info@hellocamp.pt</a>
+          {/* CAIXA DE CALL TO ACTION (MODERNA E ENQUADRADA COM A MARCA) */}
+          <div className="bg-slate-50 rounded-xl border border-slate-200 p-8 text-center">
+            <h3 className="text-xl font-bold text-slate-900 mb-3">
+              {isEn ? 'Ready to get started?' : 'Pronto para começar?'}
+            </h3>
+            <p className="text-sm text-slate-500 mb-8 max-w-md mx-auto">
+              {isEn 
+                ? 'Send us an email with your company details and our onboarding team will contact you within 24 hours.' 
+                : 'Envie-nos um email com os dados da sua empresa e a nossa equipa entrará em contacto consigo em 24 horas.'}
+            </p>
+            
+            <a 
+              href="mailto:info@hellocamp.pt" 
+              className="inline-flex justify-center items-center px-8 py-3.5 text-sm font-bold text-white bg-[#EBA914] hover:bg-[#d49612] rounded-lg transition-colors shadow-sm"
+            >
+              info@hellocamp.pt
+            </a>
           </div>
+
         </div>
-      </div>
+      </section>
+
     </main>
+  );
+}
+
+// Subcomponente para garantir que os bullet points ficam alinhados e elegantes
+function ListItem({ title, desc }: { title: string, desc: string }) {
+  return (
+    <li className="flex items-start gap-4">
+      <div className="flex-shrink-0 w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center mt-0.5">
+        <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path>
+        </svg>
+      </div>
+      <div>
+        <h4 className="text-slate-900 font-bold text-base">{title}</h4>
+        <p className="text-slate-500 text-sm mt-0.5">{desc}</p>
+      </div>
+    </li>
   );
 }
