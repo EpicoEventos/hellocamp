@@ -3,7 +3,7 @@ import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import BotaoFavorito from "../../../components/BotaoFavorito";
 
-// 1. O CHEF DO SEO: Injeta os títulos e descrições dinâmicos para o Google
+// 1. O CHEF DO SEO
 export async function generateMetadata({ 
   params 
 }: { 
@@ -13,7 +13,6 @@ export async function generateMetadata({
   const isEn = lang === 'en';
   const nomeLimpo = decodeURIComponent(paisNome);
 
-  // Vai ler o SEO do país à base de dados
   const { data: pais } = await supabase
     .from('paises')
     .select('seo_titulo, seo_descricao, seo_titulo_en, seo_descricao_en, nome, nome_en')
@@ -54,21 +53,21 @@ export default async function PesquisaPorPais({
   
   const nomePaisInicial = decodeURIComponent(paisNome);
 
-  // Captura os filtros do URL (se existirem)
+  // Captura os filtros do URL
   const categoriaParam = sp?.categoria || "";
   const distritoParam = sp?.distrito || "";
   const idadeParam = sp?.idade || "";
 
   const mostrarDistritos = nomePaisInicial === "Portugal";
 
-  // Busca os dados editoriais do País
+  // Busca os dados editoriais
   const { data: dadosPais } = await supabase
     .from('paises')
     .select('*')
     .ilike('nome', nomePaisInicial)
     .single();
 
-  // Busca os campos de férias aplicando os filtros
+  // Busca os campos de férias
   let query = supabase.from("campos").select("*").not('contrato_parceiro_url', 'is', null);
 
   query = query.or(`pais.ilike.%${nomePaisInicial}%,pais_en.ilike.%${nomePaisInicial}%`);
@@ -82,10 +81,9 @@ export default async function PesquisaPorPais({
   // Preparação dos textos
   const nomePaisApresentar = isEn && dadosPais?.nome_en ? dadosPais.nome_en : nomePaisInicial;
   
-  // Se não existir descrição na BD, usamos uma genérica bonita
   const descricaoPadrao = isEn 
-    ? `Explore premium holiday camps in ${nomePaisApresentar}. From thrilling outdoor adventures and intensive sports clinics to creative arts and language immersion, discover handpicked programs designed to provide unforgettable experiences.` 
-    : `Explore os melhores campos de férias em ${nomePaisApresentar}. Desde aventuras ao ar livre e clínicas desportivas intensivas até programas de artes e imersão linguística, descubra opções premium desenhadas para proporcionar experiências inesquecíveis.`;
+    ? `Explore premium holiday camps in ${nomePaisApresentar}. From thrilling outdoor adventures and intensive sports clinics to creative arts and language immersion, discover handpicked programs.` 
+    : `Explore os melhores campos de férias em ${nomePaisApresentar}. Desde aventuras ao ar livre e clínicas desportivas até programas de artes e imersão linguística, descubra opções premium desenhadas para experiências inesquecíveis.`;
     
   const descPaisFinal = isEn 
     ? (dadosPais?.seo_descricao_en || descricaoPadrao) 
@@ -94,44 +92,37 @@ export default async function PesquisaPorPais({
   const distritosPT = ["Aveiro", "Beja", "Braga", "Bragança", "Castelo Branco", "Coimbra", "Évora", "Faro", "Guarda", "Leiria", "Lisboa", "Portalegre", "Porto", "Santarém", "Setúbal", "Viana do Castelo", "Vila Real", "Viseu"];
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-900 font-sans">
+    <main className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-20">
       
-      {/* 1. CABEÇALHO EDITORIAL (HERO SECTION) */}
-      <section className="bg-white border-b border-slate-200 pt-10 pb-12 px-4 md:px-6">
+      {/* 1. CABEÇALHO EDITORIAL (REDUZIDO E MAIS ELEGANTE) */}
+      <section className="bg-white pt-8 pb-8 px-4 md:px-6">
         <div className="max-w-[1100px] mx-auto">
-          <Link href={`/${lang}`} className="inline-block mb-6 text-xs font-bold text-slate-500 no-underline hover:text-emerald-600 transition-colors">
+          <Link href={`/${lang}`} className="inline-block mb-4 text-xs font-bold text-slate-400 no-underline hover:text-emerald-600 transition-colors">
             &larr; {isEn ? 'Back to Home' : 'Voltar ao Início'}
           </Link>
 
-          <div className="flex flex-col md:flex-row gap-8 items-start md:items-center justify-between">
-            <div className="max-w-2xl">
-              <span className="block text-xs font-bold text-emerald-600 uppercase tracking-wider mb-2">
+          <div className="flex flex-col md:flex-row gap-6 items-start md:items-center justify-between">
+            <div className="max-w-3xl">
+              <span className="block text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-2">
                 {isEn ? 'Destination Guide' : 'Guia de Destino'}
               </span>
-              <h1 className="text-4xl md:text-5xl font-black text-slate-900 mb-4 tracking-tight capitalize">
+              <h1 className="text-3xl md:text-4xl font-black text-slate-900 mb-3 tracking-tight capitalize">
                 {isEn ? `Holiday Camps in ${nomePaisApresentar}` : `Campos de Férias em ${nomePaisApresentar}`}
               </h1>
-              <p className="text-base md:text-lg text-slate-600 leading-relaxed font-medium">
+              <p className="text-sm md:text-base text-slate-500 leading-relaxed font-medium">
                 {descPaisFinal}
               </p>
             </div>
-
-            {/* Mostra a imagem do país se existir na BD */}
-            {dadosPais?.imagem_capa && (
-               <div className="w-full md:w-64 h-48 md:h-64 rounded-2xl overflow-hidden flex-shrink-0 shadow-lg shadow-slate-200/50 hidden sm:block">
-                 <img src={dadosPais.imagem_capa} alt={nomePaisApresentar} className="w-full h-full object-cover" />
-               </div>
-            )}
           </div>
         </div>
       </section>
 
-      {/* 2. BARRA DE FILTROS MINIMALISTA (Usando formulário GET nativo para SEO) */}
-      <section className="bg-slate-900 border-b border-slate-800 py-4 px-4 md:px-6 sticky top-[72px] md:top-[80px] z-30 shadow-md">
+      {/* 2. BARRA DE FILTROS (TEMA CLARO IGUAL AO RESTO DO SITE) */}
+      <section className="bg-white border-y border-slate-200 py-4 px-4 md:px-6 sticky top-[72px] md:top-[80px] z-30 shadow-sm">
         <div className="max-w-[1100px] mx-auto">
-          <form action={`/${lang}/pesquisa/${encodeURIComponent(nomePaisInicial)}`} method="GET" className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 items-center">
+          <form action={`/${lang}/pesquisa/pais/${encodeURIComponent(nomePaisInicial)}`} method="GET" className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 items-center">
             
-            <select name="categoria" defaultValue={categoriaParam} className="w-full p-2.5 bg-slate-800 text-white border border-slate-700 rounded-lg text-sm font-bold outline-none focus:border-emerald-500">
+            <select name="categoria" defaultValue={categoriaParam} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 outline-none appearance-none cursor-pointer focus:border-emerald-500 focus:bg-white transition-colors" style={{ backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1em' }}>
               <option value="">{isEn ? 'All Categories' : 'Todas as Categorias'}</option>
               <option value="Desporto">{isEn ? 'Sports' : 'Desporto'}</option>
               <option value="Aventura & Natureza">{isEn ? 'Adventure' : 'Aventura & Natureza'}</option>
@@ -141,25 +132,25 @@ export default async function PesquisaPorPais({
             </select>
 
             {mostrarDistritos && (
-              <select name="distrito" defaultValue={distritoParam} className="w-full p-2.5 bg-slate-800 text-white border border-slate-700 rounded-lg text-sm font-bold outline-none focus:border-emerald-500">
+              <select name="distrito" defaultValue={distritoParam} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 outline-none appearance-none cursor-pointer focus:border-emerald-500 focus:bg-white transition-colors" style={{ backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1em' }}>
                 <option value="">{isEn ? 'All Districts' : 'Todos os Distritos'}</option>
                 {distritosPT.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
             )}
 
-            <select name="idade" defaultValue={idadeParam} className="w-full p-2.5 bg-slate-800 text-white border border-slate-700 rounded-lg text-sm font-bold outline-none focus:border-emerald-500">
+            <select name="idade" defaultValue={idadeParam} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 outline-none appearance-none cursor-pointer focus:border-emerald-500 focus:bg-white transition-colors" style={{ backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1em' }}>
               <option value="">{isEn ? 'All Ages' : 'Todas as Idades'}</option>
               <option value="6-9 anos">6-9 {isEn ? 'years' : 'anos'}</option>
               <option value="10-13 anos">10-13 {isEn ? 'years' : 'anos'}</option>
               <option value="14-17 anos">14-17 {isEn ? 'years' : 'anos'}</option>
             </select>
 
-            <button type="submit" className="w-full p-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold transition-colors">
+            <button type="submit" className="w-full p-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-bold transition-colors shadow-sm">
               {isEn ? 'Update' : 'Atualizar'}
             </button>
 
             {(categoriaParam || distritoParam || idadeParam) && (
-              <Link href={`/${lang}/pesquisa/${encodeURIComponent(nomePaisInicial)}`} className="text-sm font-bold text-amber-500 hover:text-amber-400 text-center sm:text-left transition-colors">
+              <Link href={`/${lang}/pesquisa/pais/${encodeURIComponent(nomePaisInicial)}`} className="text-sm font-bold text-red-500 hover:text-red-600 text-center sm:text-left transition-colors">
                 {isEn ? 'Clear filters' : 'Limpar filtros'}
               </Link>
             )}
@@ -170,7 +161,7 @@ export default async function PesquisaPorPais({
       {/* 3. RESULTADOS DA PESQUISA */}
       <section className="max-w-[1100px] mx-auto px-4 py-8 md:py-12">
         {!campos || campos.length === 0 ? (
-          <div className="text-center p-12 bg-white rounded-2xl border border-slate-100 shadow-sm">
+          <div className="text-center p-12 bg-white rounded-2xl border border-slate-200 shadow-sm">
             <p className="text-lg text-slate-500 font-bold">{isEn ? 'No camps found in this destination.' : 'Não foram encontrados programas neste destino.'}</p>
           </div>
         ) : (
@@ -185,7 +176,7 @@ export default async function PesquisaPorPais({
                 const precoVisivel = campo.preco || (campo.turnos && campo.turnos.length > 0 ? campo.turnos[0].preco : 0);
 
                 return (
-                  <div key={campo.id} className="flex flex-col bg-white rounded-2xl overflow-hidden border border-slate-200 relative shadow-sm hover:shadow-xl transition-all duration-300 group">
+                  <div key={campo.id} className="group flex flex-col bg-white rounded-2xl overflow-hidden border border-slate-200 relative shadow-sm hover:shadow-xl transition-all duration-300">
                     <Link href={`/${lang}/campo/${campo.id}`} className="absolute inset-0 z-10"><span className="sr-only">Explorar</span></Link>
                     <div className="absolute top-3 right-3 z-20"><BotaoFavorito campoId={campo.id} /></div>
 
@@ -221,13 +212,13 @@ export default async function PesquisaPorPais({
          <div className="max-w-[1100px] mx-auto">
             <h3 className="text-xl font-black text-slate-900 mb-6">{isEn ? `Explore more in ${nomePaisApresentar}` : `Explore mais em ${nomePaisApresentar}`}</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Link href={`/${lang}/pesquisa/${encodeURIComponent(nomePaisInicial)}?categoria=Desporto`} className="p-4 bg-slate-50 border border-slate-100 rounded-xl hover:border-emerald-500 transition-colors text-sm font-bold text-slate-700 no-underline">
+              <Link href={`/${lang}/pesquisa/pais/${encodeURIComponent(nomePaisInicial)}?categoria=Desporto`} className="p-4 bg-slate-50 border border-slate-200 rounded-xl hover:border-emerald-500 transition-colors text-sm font-bold text-slate-700 no-underline flex items-center gap-2 shadow-sm hover:shadow-md">
                 ⚽ {isEn ? `Sports Camps in ${nomePaisApresentar}` : `Campos de Desporto em ${nomePaisApresentar}`}
               </Link>
-              <Link href={`/${lang}/pesquisa/${encodeURIComponent(nomePaisInicial)}?categoria=Línguas`} className="p-4 bg-slate-50 border border-slate-100 rounded-xl hover:border-emerald-500 transition-colors text-sm font-bold text-slate-700 no-underline">
+              <Link href={`/${lang}/pesquisa/pais/${encodeURIComponent(nomePaisInicial)}?categoria=Línguas`} className="p-4 bg-slate-50 border border-slate-200 rounded-xl hover:border-emerald-500 transition-colors text-sm font-bold text-slate-700 no-underline flex items-center gap-2 shadow-sm hover:shadow-md">
                 🗣️ {isEn ? `Language Camps in ${nomePaisApresentar}` : `Campos de Línguas em ${nomePaisApresentar}`}
               </Link>
-              <Link href={`/${lang}/pesquisa/${encodeURIComponent(nomePaisInicial)}?categoria=Aventura & Natureza`} className="p-4 bg-slate-50 border border-slate-100 rounded-xl hover:border-emerald-500 transition-colors text-sm font-bold text-slate-700 no-underline">
+              <Link href={`/${lang}/pesquisa/pais/${encodeURIComponent(nomePaisInicial)}?categoria=Aventura & Natureza`} className="p-4 bg-slate-50 border border-slate-200 rounded-xl hover:border-emerald-500 transition-colors text-sm font-bold text-slate-700 no-underline flex items-center gap-2 shadow-sm hover:shadow-md">
                 🏕️ {isEn ? `Adventure Camps in ${nomePaisApresentar}` : `Campos de Aventura em ${nomePaisApresentar}`}
               </Link>
             </div>
