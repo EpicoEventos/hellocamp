@@ -18,7 +18,6 @@ export default function ListaCriancas({ params }: { params: Promise<{ lang: stri
     const fetchCriancas = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
-
       const { data } = await supabase.from('criancas').select('*').eq('cliente_id', session.user.id).order('created_at', { ascending: false });
       setCriancas(data || []);
       setLoading(false);
@@ -29,8 +28,7 @@ export default function ListaCriancas({ params }: { params: Promise<{ lang: stri
   const handleCriarNovaCrianca = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
-
-    const { data, error } = await supabase.from('criancas').insert({ cliente_id: session.user.id, nome: 'Novo Participante' }).select().single();
+    const { data } = await supabase.from('criancas').insert({ cliente_id: session.user.id, nome: 'Novo Participante' }).select().single();
     if (data) router.push(`/${lang}/cliente/criancas/${data.id}`);
   };
 
@@ -41,69 +39,57 @@ export default function ListaCriancas({ params }: { params: Promise<{ lang: stri
   };
 
   return (
-    <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+    <div className="max-w-[1000px] mx-auto pb-10">
       
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem' }}>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
         <div>
-          <h1 style={{ fontSize: '2.25rem', fontWeight: '900', color: '#0f172a', margin: 0 }}>
+          <h1 className="text-3xl md:text-4xl font-black text-slate-900 m-0">
             {isEn ? 'My Children' : 'Os Meus Filhos'}
           </h1>
-          <p style={{ color: '#64748b', marginTop: '0.5rem', fontSize: '15px' }}>
+          <p className="text-slate-500 mt-2 text-sm md:text-base">
             {isEn ? 'Manage participant profiles for faster bookings.' : 'Gira os perfis dos participantes para reservas mais rápidas.'}
           </p>
         </div>
         
-        <button onClick={handleCriarNovaCrianca} style={{ backgroundColor: '#059669', color: 'white', padding: '0.875rem 1.5rem', borderRadius: '0.75rem', fontWeight: 'bold', border: 'none', cursor: 'pointer', transition: 'transform 0.1s', boxShadow: '0 4px 6px -1px rgba(5, 150, 105, 0.2)' }}>
+        <button onClick={handleCriarNovaCrianca} className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-xl font-bold text-sm transition-colors shadow-sm">
           + {isEn ? 'Add Child' : 'Adicionar Filho(a)'}
         </button>
       </div>
 
       {loading ? (
-        <p style={{ color: '#64748b', fontWeight: 'bold', textAlign: 'center', padding: '3rem' }}>{isEn ? 'Loading...' : 'A carregar perfis...'}</p>
+        <p className="text-slate-500 font-bold text-center py-12">{isEn ? 'Loading...' : 'A carregar perfis...'}</p>
       ) : criancas.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '5rem', backgroundColor: 'white', border: '2px dashed #cbd5e1', borderRadius: '1.5rem' }}>
-          <p style={{ color: '#64748b', marginBottom: '1.5rem', fontSize: '1.125rem' }}>{isEn ? 'No children profiles found.' : 'Ainda não adicionou nenhum filho(a).'}</p>
-          <button onClick={handleCriarNovaCrianca} style={{ color: '#059669', fontWeight: 'bold', background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.125rem' }}>
+        <div className="text-center py-16 px-4 bg-white border-2 border-dashed border-slate-300 rounded-2xl">
+          <p className="text-slate-500 mb-4 text-base md:text-lg">{isEn ? 'No children profiles found.' : 'Ainda não adicionou nenhum filho(a).'}</p>
+          <button onClick={handleCriarNovaCrianca} className="text-emerald-600 font-bold bg-transparent text-base hover:text-emerald-700">
             {isEn ? 'Create profile now →' : 'Criar perfil agora →'}
           </button>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.5rem' }}>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {criancas.map(c => {
             const idade = calcularIdade(c.data_nascimento);
-            
             return (
-              <Link key={c.id} href={`/${lang}/cliente/criancas/${c.id}`} style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '1.5rem', border: '1px solid #e2e8f0', textDecoration: 'none', color: 'inherit', display: 'flex', flexDirection: 'column', transition: 'transform 0.2s, box-shadow 0.2s', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-                  <h3 style={{ margin: 0, fontSize: '1.5rem', fontWeight: '900', color: '#0f172a', lineHeight: 1.2 }}>{c.nome}</h3>
-                </div>
+              <Link key={c.id} href={`/${lang}/cliente/criancas/${c.id}`} className="bg-white p-6 rounded-2xl border border-slate-200 no-underline text-inherit flex flex-col shadow-sm hover:shadow-md hover:border-slate-300 transition-all">
+                <h3 className="m-0 text-xl font-black text-slate-900 leading-tight mb-4 truncate">{c.nome}</h3>
 
-                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
+                <div className="flex gap-2 flex-wrap mb-6">
                   {idade !== null && (
-                    <span style={{ backgroundColor: '#f1f5f9', color: '#475569', padding: '0.25rem 0.75rem', borderRadius: '999px', fontSize: '12px', fontWeight: 'bold' }}>
-                      🎂 {idade} {isEn ? 'years' : 'anos'}
-                    </span>
+                    <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-xs font-bold">🎂 {idade} {isEn ? 'years' : 'anos'}</span>
                   )}
                   {c.sexo && (
-                    <span style={{ backgroundColor: '#f1f5f9', color: '#475569', padding: '0.25rem 0.75rem', borderRadius: '999px', fontSize: '12px', fontWeight: 'bold' }}>
-                      👤 {c.sexo}
-                    </span>
-                  )}
-                  {c.nif && (
-                    <span style={{ backgroundColor: '#f1f5f9', color: '#475569', padding: '0.25rem 0.75rem', borderRadius: '999px', fontSize: '12px', fontWeight: 'bold' }}>
-                      📑 NIF {c.nif}
-                    </span>
+                    <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-xs font-bold">👤 {c.sexo}</span>
                   )}
                 </div>
 
-                <div style={{ marginTop: 'auto', paddingTop: '1.5rem', borderTop: '1px solid #f1f5f9' }}>
+                <div className="mt-auto pt-4 border-t border-slate-100">
                   {c.restricoes_alimentares ? (
-                    <div style={{ padding: '0.75rem', backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', borderRadius: '0.75rem', fontSize: '13px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      ⚠️ {isEn ? 'Restrictions:' : 'Alergias:'} <span style={{ fontWeight: 'normal' }}>{c.restricoes_alimentares}</span>
+                    <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs font-bold flex items-center gap-2">
+                      ⚠️ <span className="font-normal truncate">{isEn ? 'Restrictions:' : 'Alergias:'} {c.restricoes_alimentares}</span>
                     </div>
                   ) : (
-                    <div style={{ padding: '0.75rem', backgroundColor: '#f0fdf4', border: '1px solid #d1fae5', color: '#047857', borderRadius: '0.75rem', fontSize: '13px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      ✅ {isEn ? 'No health restrictions' : 'Sem restrições de saúde'}
+                    <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-xs font-bold flex items-center gap-2">
+                      ✅ <span className="font-normal">{isEn ? 'No health restrictions' : 'Sem restrições de saúde'}</span>
                     </div>
                   )}
                 </div>

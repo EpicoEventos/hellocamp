@@ -1,7 +1,7 @@
-import { supabase } from "../../../../lib/supabase";
+import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import MapaWrapper from "./MapaWrapper";
-import { getDictionary } from "../../../../lib/getDictionary";
+import { getDictionary } from "@/lib/getDictionary";
 
 export default async function PaginaMapa({
   params,
@@ -18,7 +18,6 @@ export default async function PaginaMapa({
   const idade = sp?.idade || "";
   const lingua = sp?.lingua || "";
 
-  // FILTRO APLICADO: Só procura campos com contrato assinado
   let query = supabase.from("campos").select("*").not("contrato_parceiro_url", "is", null);
 
   if (categoria) query = query.eq("categoria", categoria);
@@ -27,11 +26,7 @@ export default async function PaginaMapa({
 
   const { data: campos } = await query;
 
-  // FILTRO APLICADO: Só extrai categorias/idades de campos com contrato assinado
-  const { data: todosFiltros } = await supabase
-    .from('campos')
-    .select('categoria, categoria_en, idade, idade_en, linguas_faladas')
-    .not("contrato_parceiro_url", "is", null);
+  const { data: todosFiltros } = await supabase.from('campos').select('categoria, categoria_en, idade, idade_en, linguas_faladas').not("contrato_parceiro_url", "is", null);
   
   const categoriasMap = new Map();
   const idadesMap = new Map();
@@ -45,71 +40,68 @@ export default async function PaginaMapa({
     });
   }
 
-  // Preparar as opções para os dropdowns respeitando o idioma ativo
   const categoriasOpcoes = Array.from(categoriasMap.entries()).map(([pt, en]) => ({ valor: pt, label: lang === 'en' ? en : pt }));
   const idadesOpcoes = Array.from(idadesMap.entries()).map(([pt, en]) => ({ valor: pt, label: lang === 'en' ? en : pt }));
   const linguasUnicas = Array.from(linguasMap);
 
   return (
-    <main style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 80px)', overflow: 'hidden', backgroundColor: '#f8fafc', fontFamily: 'sans-serif' }}>
-      
-      {/* LAYOUT PRINCIPAL */}
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+    <main className="flex flex-col md:flex-row h-[calc(100vh-80px)] bg-slate-50 font-sans overflow-hidden">
         
-        {/* BARRA LATERAL (Filtros) */}
-        <aside style={{ width: '320px', backgroundColor: 'white', borderRight: '1px solid #e2e8f0', overflowY: 'auto', padding: '1.5rem', zIndex: 10, display: 'flex', flexDirection: 'column' }}>
-          
-          <Link href={`/${lang}`} style={{ display: 'inline-block', marginBottom: '1.5rem', fontSize: '13px', fontWeight: 'bold', color: '#64748b', textDecoration: 'none' }}>
-            &larr; {dict.mapa.voltar}
-          </Link>
+      <aside className="w-full md:w-[320px] bg-white border-b md:border-b-0 md:border-r border-slate-200 overflow-y-auto p-4 md:p-6 flex flex-col flex-shrink-0 shadow-sm z-10 max-h-[40vh] md:max-h-full">
+        
+        <Link href={`/${lang}`} className="hidden md:inline-block mb-6 text-xs font-bold text-slate-500 no-underline hover:text-emerald-600">
+          &larr; {dict.mapa.voltar}
+        </Link>
 
-          <h2 style={{ fontSize: '1.125rem', fontWeight: '800', color: '#0f172a', marginBottom: '1.5rem' }}>{dict.mapa.filtros}</h2>
+        <h2 className="text-lg font-black text-slate-900 mb-4">{dict.mapa.filtros}</h2>
+        
+        <form action={`/${lang}/mapa`} method="GET" className="flex flex-col gap-4">
           
-          <form action={`/${lang}/mapa`} method="GET" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            
+          <div className="grid grid-cols-2 md:grid-cols-1 gap-3">
             <div>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#475569', marginBottom: '0.5rem' }}>{dict.mapa.categoria}</label>
-              <select name="categoria" defaultValue={categoria} style={{ width: '100%', padding: '0.75rem', borderRadius: '0.75rem', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', fontSize: '13px', color: '#334155', outline: 'none' }}>
+              <label className="block text-xs font-bold text-slate-600 mb-1">{dict.mapa.categoria}</label>
+              <select name="categoria" defaultValue={categoria} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none">
                 <option value="">{dict.mapa.todas}</option>
                 {categoriasOpcoes.map(cat => <option key={cat.valor} value={cat.valor}>{cat.label}</option>)}
               </select>
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#475569', marginBottom: '0.5rem' }}>{dict.mapa.idade}</label>
-              <select name="idade" defaultValue={idade} style={{ width: '100%', padding: '0.75rem', borderRadius: '0.75rem', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', fontSize: '13px', color: '#334155', outline: 'none' }}>
+              <label className="block text-xs font-bold text-slate-600 mb-1">{dict.mapa.idade}</label>
+              <select name="idade" defaultValue={idade} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none">
                 <option value="">{dict.mapa.qualquer_idade}</option>
                 {idadesOpcoes.map(id => <option key={id.valor} value={id.valor}>{id.label}</option>)}
               </select>
             </div>
 
-            <div>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#475569', marginBottom: '0.5rem' }}>{dict.mapa.linguas}</label>
-              <select name="lingua" defaultValue={lingua} style={{ width: '100%', padding: '0.75rem', borderRadius: '0.75rem', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', fontSize: '13px', color: '#334155', outline: 'none' }}>
+            <div className="col-span-2 md:col-span-1">
+              <label className="block text-xs font-bold text-slate-600 mb-1">{dict.mapa.linguas}</label>
+              <select name="lingua" defaultValue={lingua} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none">
                 <option value="">{dict.mapa.qualquer_lingua}</option>
                 {linguasUnicas.map(lin => <option key={lin} value={lin}>{lin}</option>)}
               </select>
             </div>
+          </div>
 
-            <button type="submit" style={{ marginTop: '1rem', width: '100%', backgroundColor: '#059669', color: 'white', fontWeight: 'bold', padding: '0.875rem', borderRadius: '0.75rem', fontSize: '13px', cursor: 'pointer', border: 'none' }}>
+          <div className="flex items-center gap-3 mt-2">
+            <button type="submit" className="flex-1 bg-emerald-600 text-white font-bold py-2.5 rounded-lg text-sm">
               {dict.mapa.atualizar}
             </button>
-            <Link href={`/${lang}/mapa`} style={{ textAlign: 'center', fontSize: '12px', color: '#64748b', fontWeight: 'bold', textDecoration: 'none', marginTop: '0.5rem' }}>
+            <Link href={`/${lang}/mapa`} className="text-sm text-slate-500 font-bold whitespace-nowrap">
               {dict.mapa.limpar}
             </Link>
-          </form>
-
-          <div style={{ marginTop: '2.5rem', paddingTop: '1.5rem', borderTop: '1px solid #e2e8f0' }}>
-            <p style={{ fontSize: '13px', fontWeight: '600', color: '#0f172a' }}>{campos?.length || 0} {dict.mapa.encontrados}</p>
           </div>
-        </aside>
+        </form>
 
-        {/* ÁREA DO MAPA */}
-        <section style={{ flex: 1, position: 'relative' }}>
-          <MapaWrapper campos={campos || []} />
-        </section>
+        <div className="mt-4 md:mt-8 pt-4 border-t border-slate-100 hidden md:block">
+          <p className="text-sm font-bold text-slate-900">{campos?.length || 0} {dict.mapa.encontrados}</p>
+        </div>
+      </aside>
 
-      </div>
+      <section className="flex-1 relative min-h-[50vh] md:min-h-0">
+        <MapaWrapper campos={campos || []} />
+      </section>
+
     </main>
   );
 }
