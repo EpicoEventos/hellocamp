@@ -1,110 +1,137 @@
-"use client";
-
-import { useEffect, useState, use } from "react";
+import { Metadata } from "next";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import BotaoFavorito from "../../../components/BotaoFavorito";
-import React from "react";
-import { useRouter } from "next/navigation";
 
-export default function PesquisaPorPais({ params }: { params: Promise<{ lang: string; paisNome: string }> }) {
-  const resolvedParams = use(params);
-  const { lang, paisNome } = resolvedParams;
+// 1. O CHEF DO SEO: Injeta os títulos e descrições dinâmicos para o Google
+export async function generateMetadata({ 
+  params 
+}: { 
+  params: Promise<{ lang: string; paisNome: string }> 
+}): Promise<Metadata> {
+  const { lang, paisNome } = await params;
   const isEn = lang === 'en';
-  const router = useRouter();
+  const nomeLimpo = decodeURIComponent(paisNome);
 
-  const nomePaisInicial = decodeURIComponent(paisNome);
-  
-  // Estados dos Filtros
-  const [paisSelecionado, setPaisSelecionado] = useState(nomePaisInicial);
-  const [categoriaSelecionada, setCategoriaSelecionada] = useState("");
-  const [distritoSelecionado, setDistritoSelecionado] = useState("");
-  const [idadeSelecionada, setIdadeSelecionada] = useState("");
+  // Vai ler o SEO do país à base de dados
+  const { data: pais } = await supabase
+    .from('paises')
+    .select('seo_titulo, seo_descricao, seo_titulo_en, seo_descricao_en, nome, nome_en')
+    .ilike('nome', nomeLimpo)
+    .single();
 
-  const [campos, setCampos] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  if (!pais) {
+    return { title: isEn ? `Camps in ${nomeLimpo} | HelloCamp` : `Campos em ${nomeLimpo} | HelloCamp` };
+  }
 
-  // Estados de SEO (Serão preenchidos via Supabase futuramente)
-  const [seoDescricao, setSeoDescricao] = useState<string>("");
+  const title = isEn 
+    ? (pais.seo_titulo_en || `Summer Camps in ${pais.nome_en || pais.nome} | HelloCamp`) 
+    : (pais.seo_titulo || `Campos de Férias em ${pais.nome} | HelloCamp`);
+    
+  const description = isEn ? pais.seo_descricao_en : pais.seo_descricao;
 
-  const mostrarDistritos = paisSelecionado === "Portugal" || paisSelecionado === "";
-
-  useEffect(() => {
-    const fetchDados = async () => {
-      setLoading(true);
-      
-      // 1. Lógica de Pesquisa de Campos (Mantida intacta)
-      let query = supabase.from("campos").select("*").not('contrato_parceiro_url', 'is', null);
-
-      if (paisSelecionado) query = query.or(`pais.ilike.%${paisSelecionado}%,pais_en.ilike.%${paisSelecionado}%`);
-      if (categoriaSelecionada) query = query.eq("categoria", categoriaSelecionada);
-      if (distritoSelecionado && mostrarDistritos) query = query.ilike("Distrito", `%${distritoSelecionado}%`);
-      if (idadeSelecionada) query = query.eq("idade", idadeSelecionada);
-
-      const { data, error } = await query.order('id', { ascending: false });
-      if (!error) setCampos(data || []);
-
-      // 2. Simulação de Leitura de SEO (Aqui fará o fetch à sua tabela de destinos futuramente)
-      // Exemplo: const { data: destino } = await supabase.from("paises").select("seo_descricao").eq("nome", paisSelecionado).single();
-      setSeoDescricao(
-        isEn 
-        ? `Explore premium holiday camps in ${paisSelecionado}. From thrilling outdoor adventures and intensive sports clinics to creative arts and language immersion, discover handpicked programs designed to provide unforgettable experiences for children and teens.` 
-        : `Explore os melhores campos de férias em ${paisSelecionado}. Desde aventuras ao ar livre e clínicas desportivas intensivas até programas de artes e imersão linguística, descubra opções premium desenhadas para proporcionar experiências inesquecíveis a crianças e jovens.`
-      );
-
-      setLoading(false);
-    };
-    fetchDados();
-  }, [paisSelecionado, categoriaSelecionada, distritoSelecionado, idadeSelecionada, mostrarDistritos]);
-
-  const handlePaisChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const novoPais = e.target.value;
-    setPaisSelecionado(novoPais);
-    if (novoPais !== "Portugal" && novoPais !== "") setDistritoSelecionado(""); 
-    router.replace(`/${lang}/pesquisa/${encodeURIComponent(novoPais)}`);
+  return {
+    title: title,
+    description: description,
+    openGraph: {
+      title: title,
+      description: description || '',
+    }
   };
+}
+
+// 2. O COMPONENTE PRINCIPAL DA PÁGINA
+export default async function PesquisaPorPais({ 
+  params,
+  searchParams
+}: { 
+  params: Promise<{ lang: string; paisNome: string }>;
+  searchParams?: Promise<{ [key: string]: string | undefined }> 
+}) {
+  const { lang, paisNome } = await params;
+  const sp = await searchParams;
+  const isEn = lang === 'en';
+  
+  const nomePaisInicial = decodeURIComponent(paisNome);
+
+  // Captura os filtros do URL (se existirem)
+  const categoriaParam = sp?.categoria || "";
+  const distritoParam = sp?.distrito || "";
+  const idadeParam = sp?.idade || "";
+
+  const mostrarDistritos = nomePaisInicial === "Portugal";
+
+  // Busca os dados editoriais do País
+  const { data: dadosPais } = await supabase
+    .from('paises')
+    .select('*')
+    .ilike('nome', nomePaisInicial)
+    .single();
+
+  // Busca os campos de férias aplicando os filtros
+  let query = supabase.from("campos").select("*").not('contrato_parceiro_url', 'is', null);
+
+  query = query.or(`pais.ilike.%${nomePaisInicial}%,pais_en.ilike.%${nomePaisInicial}%`);
+  
+  if (categoriaParam) query = query.eq("categoria", categoriaParam);
+  if (distritoParam && mostrarDistritos) query = query.ilike("Distrito", `%${distritoParam}%`);
+  if (idadeParam) query = query.eq("idade", idadeParam);
+
+  const { data: campos } = await query.order('id', { ascending: false });
+
+  // Preparação dos textos
+  const nomePaisApresentar = isEn && dadosPais?.nome_en ? dadosPais.nome_en : nomePaisInicial;
+  
+  // Se não existir descrição na BD, usamos uma genérica bonita
+  const descricaoPadrao = isEn 
+    ? `Explore premium holiday camps in ${nomePaisApresentar}. From thrilling outdoor adventures and intensive sports clinics to creative arts and language immersion, discover handpicked programs designed to provide unforgettable experiences.` 
+    : `Explore os melhores campos de férias em ${nomePaisApresentar}. Desde aventuras ao ar livre e clínicas desportivas intensivas até programas de artes e imersão linguística, descubra opções premium desenhadas para proporcionar experiências inesquecíveis.`;
+    
+  const descPaisFinal = isEn 
+    ? (dadosPais?.seo_descricao_en || descricaoPadrao) 
+    : (dadosPais?.seo_descricao || descricaoPadrao);
 
   const distritosPT = ["Aveiro", "Beja", "Braga", "Bragança", "Castelo Branco", "Coimbra", "Évora", "Faro", "Guarda", "Leiria", "Lisboa", "Portalegre", "Porto", "Santarém", "Setúbal", "Viana do Castelo", "Vila Real", "Viseu"];
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900 font-sans">
       
-      {/* 1. CABEÇALHO EDITORIAL (SEO HERO SECTION) */}
+      {/* 1. CABEÇALHO EDITORIAL (HERO SECTION) */}
       <section className="bg-white border-b border-slate-200 pt-10 pb-12 px-4 md:px-6">
         <div className="max-w-[1100px] mx-auto">
           <Link href={`/${lang}`} className="inline-block mb-6 text-xs font-bold text-slate-500 no-underline hover:text-emerald-600 transition-colors">
             &larr; {isEn ? 'Back to Home' : 'Voltar ao Início'}
           </Link>
 
-          <div className="max-w-3xl">
-            <span className="block text-xs font-bold text-emerald-600 uppercase tracking-wider mb-2">
-              {isEn ? 'Destination Guide' : 'Guia de Destino'}
-            </span>
-            <h1 className="text-4xl md:text-5xl font-black text-slate-900 mb-4 tracking-tight">
-              {isEn ? `Holiday Camps in ${paisSelecionado}` : `Campos de Férias em ${paisSelecionado}`}
-            </h1>
-            <p className="text-base md:text-lg text-slate-600 leading-relaxed font-medium">
-              {seoDescricao}
-            </p>
+          <div className="flex flex-col md:flex-row gap-8 items-start md:items-center justify-between">
+            <div className="max-w-2xl">
+              <span className="block text-xs font-bold text-emerald-600 uppercase tracking-wider mb-2">
+                {isEn ? 'Destination Guide' : 'Guia de Destino'}
+              </span>
+              <h1 className="text-4xl md:text-5xl font-black text-slate-900 mb-4 tracking-tight capitalize">
+                {isEn ? `Holiday Camps in ${nomePaisApresentar}` : `Campos de Férias em ${nomePaisApresentar}`}
+              </h1>
+              <p className="text-base md:text-lg text-slate-600 leading-relaxed font-medium">
+                {descPaisFinal}
+              </p>
+            </div>
+
+            {/* Mostra a imagem do país se existir na BD */}
+            {dadosPais?.imagem_capa && (
+               <div className="w-full md:w-64 h-48 md:h-64 rounded-2xl overflow-hidden flex-shrink-0 shadow-lg shadow-slate-200/50 hidden sm:block">
+                 <img src={dadosPais.imagem_capa} alt={nomePaisApresentar} className="w-full h-full object-cover" />
+               </div>
+            )}
           </div>
         </div>
       </section>
 
-      {/* 2. BARRA DE FILTROS MINIMALISTA */}
+      {/* 2. BARRA DE FILTROS MINIMALISTA (Usando formulário GET nativo para SEO) */}
       <section className="bg-slate-900 border-b border-slate-800 py-4 px-4 md:px-6 sticky top-[72px] md:top-[80px] z-30 shadow-md">
         <div className="max-w-[1100px] mx-auto">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 items-center">
+          <form action={`/${lang}/pesquisa/${encodeURIComponent(nomePaisInicial)}`} method="GET" className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 items-center">
             
-            <select value={paisSelecionado} onChange={handlePaisChange} className="w-full p-2.5 bg-slate-800 text-white border border-slate-700 rounded-lg text-sm font-bold outline-none focus:border-emerald-500">
-              <option value="Portugal">Portugal</option>
-              <option value="Espanha">{isEn ? 'Spain' : 'Espanha'}</option>
-              <option value="Reino Unido">{isEn ? 'UK' : 'Reino Unido'}</option>
-              <option value="França">{isEn ? 'France' : 'França'}</option>
-              <option value="Suíça">{isEn ? 'Switzerland' : 'Suíça'}</option>
-              <option value="Itália">{isEn ? 'Italy' : 'Itália'}</option>
-            </select>
-
-            <select value={categoriaSelecionada} onChange={(e) => setCategoriaSelecionada(e.target.value)} className="w-full p-2.5 bg-slate-800 text-white border border-slate-700 rounded-lg text-sm font-bold outline-none focus:border-emerald-500">
+            <select name="categoria" defaultValue={categoriaParam} className="w-full p-2.5 bg-slate-800 text-white border border-slate-700 rounded-lg text-sm font-bold outline-none focus:border-emerald-500">
               <option value="">{isEn ? 'All Categories' : 'Todas as Categorias'}</option>
               <option value="Desporto">{isEn ? 'Sports' : 'Desporto'}</option>
               <option value="Aventura & Natureza">{isEn ? 'Adventure' : 'Aventura & Natureza'}</option>
@@ -114,33 +141,35 @@ export default function PesquisaPorPais({ params }: { params: Promise<{ lang: st
             </select>
 
             {mostrarDistritos && (
-              <select value={distritoSelecionado} onChange={(e) => setDistritoSelecionado(e.target.value)} className="w-full p-2.5 bg-slate-800 text-white border border-slate-700 rounded-lg text-sm font-bold outline-none focus:border-emerald-500">
+              <select name="distrito" defaultValue={distritoParam} className="w-full p-2.5 bg-slate-800 text-white border border-slate-700 rounded-lg text-sm font-bold outline-none focus:border-emerald-500">
                 <option value="">{isEn ? 'All Districts' : 'Todos os Distritos'}</option>
                 {distritosPT.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
             )}
 
-            <select value={idadeSelecionada} onChange={(e) => setIdadeSelecionada(e.target.value)} className="w-full p-2.5 bg-slate-800 text-white border border-slate-700 rounded-lg text-sm font-bold outline-none focus:border-emerald-500">
+            <select name="idade" defaultValue={idadeParam} className="w-full p-2.5 bg-slate-800 text-white border border-slate-700 rounded-lg text-sm font-bold outline-none focus:border-emerald-500">
               <option value="">{isEn ? 'All Ages' : 'Todas as Idades'}</option>
               <option value="6-9 anos">6-9 {isEn ? 'years' : 'anos'}</option>
               <option value="10-13 anos">10-13 {isEn ? 'years' : 'anos'}</option>
               <option value="14-17 anos">14-17 {isEn ? 'years' : 'anos'}</option>
             </select>
 
-            {(categoriaSelecionada || distritoSelecionado || idadeSelecionada) && (
-              <button onClick={() => { setCategoriaSelecionada(''); setDistritoSelecionado(''); setIdadeSelecionada(''); }} className="text-sm font-bold text-amber-500 hover:text-amber-400 text-center sm:text-left transition-colors">
+            <button type="submit" className="w-full p-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold transition-colors">
+              {isEn ? 'Update' : 'Atualizar'}
+            </button>
+
+            {(categoriaParam || distritoParam || idadeParam) && (
+              <Link href={`/${lang}/pesquisa/${encodeURIComponent(nomePaisInicial)}`} className="text-sm font-bold text-amber-500 hover:text-amber-400 text-center sm:text-left transition-colors">
                 {isEn ? 'Clear filters' : 'Limpar filtros'}
-              </button>
+              </Link>
             )}
-          </div>
+          </form>
         </div>
       </section>
 
       {/* 3. RESULTADOS DA PESQUISA */}
       <section className="max-w-[1100px] mx-auto px-4 py-8 md:py-12">
-        {loading ? (
-          <div className="text-center py-20 text-slate-500 font-bold text-lg">{isEn ? 'Searching...' : 'A atualizar resultados...'}</div>
-        ) : campos.length === 0 ? (
+        {!campos || campos.length === 0 ? (
           <div className="text-center p-12 bg-white rounded-2xl border border-slate-100 shadow-sm">
             <p className="text-lg text-slate-500 font-bold">{isEn ? 'No camps found in this destination.' : 'Não foram encontrados programas neste destino.'}</p>
           </div>
@@ -153,6 +182,7 @@ export default function PesquisaPorPais({ params }: { params: Promise<{ lang: st
               {campos.map((campo) => {
                 const nomeVisivel = isEn && campo.nome_en ? campo.nome_en : campo.nome;
                 const localVisivel = isEn && campo.local_en ? campo.local_en : (campo.Distrito || campo.local);
+                const precoVisivel = campo.preco || (campo.turnos && campo.turnos.length > 0 ? campo.turnos[0].preco : 0);
 
                 return (
                   <div key={campo.id} className="flex flex-col bg-white rounded-2xl overflow-hidden border border-slate-200 relative shadow-sm hover:shadow-xl transition-all duration-300 group">
@@ -169,8 +199,12 @@ export default function PesquisaPorPais({ params }: { params: Promise<{ lang: st
                     <div className="flex flex-col p-5 flex-1 pointer-events-none">
                       <span className="text-xs font-bold text-emerald-700 uppercase tracking-widest mb-1">📍 {localVisivel}</span>
                       <h3 className="text-lg font-black text-slate-900 leading-tight mb-2">{nomeVisivel}</h3>
+                      <p className="text-sm text-slate-500 font-medium mb-6">
+                        {isEn ? 'Age Group:' : 'Faixa Etária:'} <span className="text-slate-900">{campo.idade}</span>
+                      </p>
+
                       <div className="mt-auto pt-4 flex items-center justify-between border-t border-slate-100">
-                        <p className="text-xl font-black text-emerald-600 m-0">{campo.preco}€</p>
+                        <p className="text-xl font-black text-emerald-600 m-0">{precoVisivel}€</p>
                         <span className="text-sm font-bold text-[#EBA914] transition-transform group-hover:translate-x-1">{isEn ? 'Explore' : 'Explorar'} &rarr;</span>
                       </div>
                     </div>
@@ -185,16 +219,16 @@ export default function PesquisaPorPais({ params }: { params: Promise<{ lang: st
       {/* 4. CROSS-LINKING (REDE DE LINKS SEO) */}
       <section className="bg-white border-t border-slate-200 py-16 px-4 md:px-6">
          <div className="max-w-[1100px] mx-auto">
-            <h3 className="text-xl font-black text-slate-900 mb-6">{isEn ? `Explore more in ${paisSelecionado}` : `Explore mais em ${paisSelecionado}`}</h3>
+            <h3 className="text-xl font-black text-slate-900 mb-6">{isEn ? `Explore more in ${nomePaisApresentar}` : `Explore mais em ${nomePaisApresentar}`}</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Link href={`/${lang}/pesquisa/${encodeURIComponent(paisSelecionado)}?categoria=Desporto`} className="p-4 bg-slate-50 border border-slate-100 rounded-xl hover:border-emerald-500 transition-colors text-sm font-bold text-slate-700 no-underline">
-                ⚽ {isEn ? `Sports Camps in ${paisSelecionado}` : `Campos de Desporto em ${paisSelecionado}`}
+              <Link href={`/${lang}/pesquisa/${encodeURIComponent(nomePaisInicial)}?categoria=Desporto`} className="p-4 bg-slate-50 border border-slate-100 rounded-xl hover:border-emerald-500 transition-colors text-sm font-bold text-slate-700 no-underline">
+                ⚽ {isEn ? `Sports Camps in ${nomePaisApresentar}` : `Campos de Desporto em ${nomePaisApresentar}`}
               </Link>
-              <Link href={`/${lang}/pesquisa/${encodeURIComponent(paisSelecionado)}?categoria=Línguas`} className="p-4 bg-slate-50 border border-slate-100 rounded-xl hover:border-emerald-500 transition-colors text-sm font-bold text-slate-700 no-underline">
-                🗣️ {isEn ? `Language Camps in ${paisSelecionado}` : `Campos de Línguas em ${paisSelecionado}`}
+              <Link href={`/${lang}/pesquisa/${encodeURIComponent(nomePaisInicial)}?categoria=Línguas`} className="p-4 bg-slate-50 border border-slate-100 rounded-xl hover:border-emerald-500 transition-colors text-sm font-bold text-slate-700 no-underline">
+                🗣️ {isEn ? `Language Camps in ${nomePaisApresentar}` : `Campos de Línguas em ${nomePaisApresentar}`}
               </Link>
-              <Link href={`/${lang}/pesquisa/${encodeURIComponent(paisSelecionado)}?categoria=Aventura & Natureza`} className="p-4 bg-slate-50 border border-slate-100 rounded-xl hover:border-emerald-500 transition-colors text-sm font-bold text-slate-700 no-underline">
-                🏕️ {isEn ? `Adventure Camps in ${paisSelecionado}` : `Campos de Aventura em ${paisSelecionado}`}
+              <Link href={`/${lang}/pesquisa/${encodeURIComponent(nomePaisInicial)}?categoria=Aventura & Natureza`} className="p-4 bg-slate-50 border border-slate-100 rounded-xl hover:border-emerald-500 transition-colors text-sm font-bold text-slate-700 no-underline">
+                🏕️ {isEn ? `Adventure Camps in ${nomePaisApresentar}` : `Campos de Aventura em ${nomePaisApresentar}`}
               </Link>
             </div>
          </div>

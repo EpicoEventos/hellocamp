@@ -75,7 +75,6 @@ export default function CaixaReserva({ campo, lang, dict }: { campo: any, lang: 
     params.set("quantidade_criancas", quantidade.toString());
     
     if (temTurnos) {
-      // Passar o turno na língua original sempre para faturação
       params.set("turno", JSON.stringify(campo.turnos[turnoIndex]));
     }
     
@@ -89,40 +88,57 @@ export default function CaixaReserva({ campo, lang, dict }: { campo: any, lang: 
     router.push(`/${lang}/checkout/${campo.id}?${params.toString()}`);
   };
 
+  const disabledReserva = !temTurnos || precoBase === 0;
+
   return (
-    <div style={{ backgroundColor: 'white', padding: '2.5rem', borderRadius: '1.5rem', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0', position: 'sticky', top: '2rem' }}>
+    <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-xl shadow-slate-200/50 sticky top-8 w-full">
       
-      <div style={{ marginBottom: '2rem' }}>
-        <p style={{ fontSize: '11px', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '0.25rem' }}>
+      {/* PREÇO BASE */}
+      <div className="mb-8">
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
           {isEn ? 'Starting from' : 'A partir de'}
         </p>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.25rem' }}>
-          <span style={{ fontSize: '3rem', fontWeight: '900', color: '#0f172a', lineHeight: 1 }}>{precoBase}€</span>
-          <span style={{ fontSize: '14px', color: '#64748b', fontWeight: '600' }}>/ {isEn ? 'child' : 'criança'}</span>
+        <div className="flex items-baseline gap-2">
+          <span className="text-4xl font-black text-slate-900 leading-none">{precoBase}€</span>
+          <span className="text-sm font-bold text-slate-500">/ {isEn ? 'child' : 'criança'}</span>
         </div>
       </div>
 
-      <div style={{ marginBottom: '1.5rem' }}>
-        <label style={labelStyle}>{isEn ? 'Select Shift' : 'Selecione o Turno'}</label>
+      {/* SELETOR DE TURNOS */}
+      <div className="mb-6">
+        <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">{isEn ? 'Select Shift' : 'Selecione o Turno'}</label>
         {temTurnos ? (
-          <select value={turnoIndex} onChange={(e) => setTurnoIndex(Number(e.target.value))} style={selectStyle}>
+          <select 
+            value={turnoIndex} 
+            onChange={(e) => setTurnoIndex(Number(e.target.value))} 
+            className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none appearance-none cursor-pointer focus:border-emerald-500"
+            style={{ backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1.2em' }}
+          >
             {turnos.map((t: any, i: number) => (
               <option key={i} value={i}>{t.nome} ({formatarData(t.data_inicio)} - {formatarData(t.data_fim)})</option>
             ))}
           </select>
         ) : (
-          <div style={{ ...selectStyle, backgroundColor: '#f1f5f9', color: '#94a3b8' } as React.CSSProperties}>{isEn ? 'Dates to be defined' : 'Datas a definir'}</div>
+          <div className="w-full p-3.5 bg-slate-100 border border-slate-200 rounded-xl text-sm font-bold text-slate-400">
+            {isEn ? 'Dates to be defined' : 'Datas a definir'}
+          </div>
         )}
       </div>
 
+      {/* SELETOR DE DIAS (Se permitido) */}
       {turnoSelecionado?.permite_dias && (
-        <div style={{ marginBottom: '1.5rem', padding: '1rem', backgroundColor: '#f0fdf4', border: '1px solid #a7f3d0', borderRadius: '0.75rem' }}>
-          <label style={{...labelStyle, color: '#047857'}}>{isEn ? 'Select Duration' : 'Duração da Inscrição'}</label>
-          <select value={diasEscolhidos} onChange={(e) => setDiasEscolhidos(e.target.value === 'full' ? 'full' : Number(e.target.value))} style={{...selectStyle, borderColor: '#a7f3d0'}}>
+        <div className="mb-6 p-4 bg-emerald-50 border border-emerald-100 rounded-xl">
+          <label className="block text-xs font-black text-emerald-700 uppercase tracking-widest mb-2">{isEn ? 'Select Duration' : 'Duração da Inscrição'}</label>
+          <select 
+            value={diasEscolhidos} 
+            onChange={(e) => setDiasEscolhidos(e.target.value === 'full' ? 'full' : Number(e.target.value))} 
+            className="w-full p-3 bg-white border border-emerald-200 rounded-lg text-sm font-bold text-emerald-800 outline-none appearance-none cursor-pointer focus:border-emerald-500"
+            style={{ backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23047857' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1.2em' }}
+          >
             <option value="full">{isEn ? 'Full Shift' : 'Turno Completo'} ({turnoSelecionado.preco}€)</option>
             {Array.from({ length: Number(turnoSelecionado.dias) || campo.duracao_dias || 5 }).map((_, i) => {
               const dias = i + 1;
-              if (dias === (Number(turnoSelecionado.dias) || campo.duracao_dias || 5)) return null; // Esconde o dia igual ao turno completo
+              if (dias === (Number(turnoSelecionado.dias) || campo.duracao_dias || 5)) return null; 
               return (
                 <option key={dias} value={dias}>
                   {dias} {isEn ? (dias === 1 ? 'Day' : 'Days') : (dias === 1 ? 'Dia' : 'Dias')} ({Number(turnoSelecionado.preco_dia) * dias}€)
@@ -133,38 +149,45 @@ export default function CaixaReserva({ campo, lang, dict }: { campo: any, lang: 
         </div>
       )}
 
+      {/* EXTRAS OPCIONAIS */}
       {(valAlimentacao > 0 || valAlojamento > 0 || valProlongamento > 0 || valTransporte > 0) && (
-        <div style={{ marginBottom: '1.5rem', borderTop: '1px solid #f1f5f9', paddingTop: '1.5rem' }}>
-          <p style={labelStyle}>{isEn ? 'Optional Extras' : 'Extras Opcionais'}</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            {valAlimentacao > 0 && <label style={checkboxStyle(extraAlimentacao)}><div style={{display:'flex', gap:'0.5rem'}}><input type="checkbox" checked={extraAlimentacao} onChange={e => setExtraAlimentacao(e.target.checked)} style={checkInputStyle} /><span style={{fontWeight: extraAlimentacao ? 'bold':'normal'}}>🍎 {isEn ? 'Meals' : 'Alimentação'}</span></div><span style={{fontWeight:'bold', color:'#059669'}}>+{(valAlimentacao * diasParaCalculo)}€</span></label>}
-            {valAlojamento > 0 && <label style={checkboxStyle(extraAlojamento)}><div style={{display:'flex', gap:'0.5rem'}}><input type="checkbox" checked={extraAlojamento} onChange={e => setExtraAlojamento(e.target.checked)} style={checkInputStyle} /><span style={{fontWeight: extraAlojamento ? 'bold':'normal'}}>🏕️ {isEn ? 'Sleepover' : 'Dormida'}</span></div><span style={{fontWeight:'bold', color:'#059669'}}>+{(valAlojamento * noitesDormida)}€</span></label>}
-            {valProlongamento > 0 && <label style={checkboxStyle(extraProlongamento)}><div style={{display:'flex', gap:'0.5rem'}}><input type="checkbox" checked={extraProlongamento} onChange={e => setExtraProlongamento(e.target.checked)} style={checkInputStyle} /><span style={{fontWeight: extraProlongamento ? 'bold':'normal'}}>⏰ {isEn ? 'Extended Hours' : 'Horário Extra'}</span></div><span style={{fontWeight:'bold', color:'#059669'}}>+{(valProlongamento * diasParaCalculo)}€</span></label>}
-            {valTransporte > 0 && <label style={checkboxStyle(extraTransporte)}><div style={{display:'flex', gap:'0.5rem'}}><input type="checkbox" checked={extraTransporte} onChange={e => setExtraTransporte(e.target.checked)} style={checkInputStyle} /><span style={{fontWeight: extraTransporte ? 'bold':'normal'}}>🚌 {isEn ? 'Transport' : 'Transporte'}</span></div><span style={{fontWeight:'bold', color:'#059669'}}>+{(valTransporte * diasParaCalculo)}€</span></label>}
+        <div className="mb-6 border-t border-slate-100 pt-6">
+          <p className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3">{isEn ? 'Optional Extras' : 'Extras Opcionais'}</p>
+          <div className="flex flex-col gap-3">
+            {valAlimentacao > 0 && <ExtraCheckbox icon="🍎" label={isEn ? 'Meals' : 'Alimentação'} price={valAlimentacao * diasParaCalculo} active={extraAlimentacao} onChange={() => setExtraAlimentacao(!extraAlimentacao)} />}
+            {valAlojamento > 0 && <ExtraCheckbox icon="🏕️" label={isEn ? 'Sleepover' : 'Dormida'} price={valAlojamento * noitesDormida} active={extraAlojamento} onChange={() => setExtraAlojamento(!extraAlojamento)} />}
+            {valProlongamento > 0 && <ExtraCheckbox icon="⏰" label={isEn ? 'Extended Hours' : 'Horário Extra'} price={valProlongamento * diasParaCalculo} active={extraProlongamento} onChange={() => setExtraProlongamento(!extraProlongamento)} />}
+            {valTransporte > 0 && <ExtraCheckbox icon="🚌" label={isEn ? 'Transport' : 'Transporte'} price={valTransporte * diasParaCalculo} active={extraTransporte} onChange={() => setExtraTransporte(!extraTransporte)} />}
           </div>
         </div>
       )}
 
-      <div style={{ marginBottom: '2.5rem', borderTop: '1px solid #f1f5f9', paddingTop: '1.5rem' }}>
-        <label style={labelStyle}>{isEn ? 'Number of Children' : 'Quantidade de Crianças'}</label>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-          <button onClick={() => setQuantidade(q => Math.max(1, q - 1))} style={qtdBtnStyle}>-</button>
-          <span style={{ fontSize: '1.5rem', fontWeight: '900', color: '#0f172a', width: '30px', textAlign: 'center' }}>{quantidade}</span>
-          <button onClick={() => setQuantidade(q => q + 1)} style={qtdBtnStyle}>+</button>
+      {/* QUANTIDADE DE CRIANÇAS */}
+      <div className="mb-8 border-t border-slate-100 pt-6">
+        <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-3">{isEn ? 'Number of Children' : 'Quantidade de Crianças'}</label>
+        <div className="flex items-center gap-4">
+          <button onClick={() => setQuantidade(q => Math.max(1, q - 1))} className="w-10 h-10 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-black text-lg hover:bg-slate-100 transition-colors shadow-sm flex items-center justify-center">-</button>
+          <span className="text-2xl font-black text-slate-900 w-8 text-center">{quantidade}</span>
+          <button onClick={() => setQuantidade(q => q + 1)} className="w-10 h-10 rounded-full border border-slate-200 bg-slate-50 text-slate-600 font-black text-lg hover:bg-slate-100 transition-colors shadow-sm flex items-center justify-center">+</button>
         </div>
       </div>
 
-      <div style={{ backgroundColor: '#f8fafc', padding: '1.5rem', borderRadius: '1rem', marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #f1f5f9' }}>
-        <span style={{ fontSize: '1.125rem', fontWeight: '800', color: '#0f172a' }}>Total</span>
-        <span style={{ fontSize: '2rem', fontWeight: '900', color: '#059669' }}>{precoTotal}€</span>
+      {/* TOTAL E BOTÃO */}
+      <div className="bg-slate-50 p-6 rounded-2xl mb-6 flex justify-between items-center border border-slate-100">
+        <span className="text-lg font-black text-slate-900">Total</span>
+        <span className="text-3xl font-black text-emerald-600">{precoTotal}€</span>
       </div>
 
-      <button onClick={handleReservar} disabled={!temTurnos || precoBase === 0} style={btnReservaStyle(!temTurnos || precoBase === 0)}>
+      <button 
+        onClick={handleReservar} 
+        disabled={disabledReserva} 
+        className={`w-full py-4 rounded-xl text-lg font-black transition-all ${disabledReserva ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-[#EBA914] hover:bg-amber-500 text-white shadow-lg shadow-amber-500/30 hover:-translate-y-1'}`}
+      >
         {isEn ? 'Book Spot Now' : 'Reservar Vaga Agora'}
       </button>
       
-      {(!temTurnos || precoBase === 0) && (
-        <p style={{ textAlign: 'center', fontSize: '12px', color: '#dc2626', marginTop: '1rem', fontWeight: 'bold' }}>
+      {disabledReserva && (
+        <p className="text-center text-xs text-red-500 mt-4 font-bold">
           {isEn ? 'No shifts defined yet.' : 'Reserva indisponível. Turnos não definidos.'}
         </p>
       )}
@@ -172,9 +195,15 @@ export default function CaixaReserva({ campo, lang, dict }: { campo: any, lang: 
   );
 }
 
-const labelStyle = { display: 'block', fontSize: '12px', fontWeight: '800', color: '#334155', textTransform: 'uppercase' as const, marginBottom: '0.5rem' };
-const selectStyle = { width: '100%', padding: '0.75rem 1rem', borderRadius: '0.5rem', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', fontSize: '13px', fontWeight: '600', color: '#0f172a', outline: 'none', appearance: 'none' as const, cursor: 'pointer', backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1.2em' };
-const qtdBtnStyle = { width: '40px', height: '40px', borderRadius: '50%', border: '1px solid #cbd5e1', backgroundColor: 'white', fontSize: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#334155', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' };
-const checkboxStyle = (active: boolean) => ({ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '13px', color: '#334155', cursor: 'pointer', padding: '0.75rem', border: active ? '2px solid #059669' : '1px solid #e2e8f0', borderRadius: '0.5rem', backgroundColor: active ? '#ecfdf5' : 'transparent', transition: 'all 0.2s' });
-const checkInputStyle = { accentColor: '#059669', width: '16px', height: '16px', cursor: 'pointer' };
-const btnReservaStyle = (disabled: boolean) => ({ width: '100%', padding: '1.25rem', backgroundColor: disabled ? '#cbd5e1' : '#de5d25', color: 'white', fontSize: '1.125rem', fontWeight: '900', borderRadius: '1rem', border: 'none', cursor: disabled ? 'not-allowed' : 'pointer', boxShadow: disabled ? 'none' : '0 8px 20px -6px rgba(222,93,37,0.4)' });
+// Subcomponente para as caixas de Extra
+function ExtraCheckbox({ icon, label, price, active, onChange }: { icon: string, label: string, price: number, active: boolean, onChange: () => void }) {
+  return (
+    <label className={`flex items-center justify-between p-3.5 rounded-xl cursor-pointer transition-all border-2 ${active ? 'border-emerald-500 bg-emerald-50' : 'border-slate-100 bg-slate-50 hover:border-slate-200'}`}>
+      <div className="flex items-center gap-3">
+        <input type="checkbox" checked={active} onChange={onChange} className="w-5 h-5 accent-emerald-600 cursor-pointer" />
+        <span className={`text-sm ${active ? 'font-black text-emerald-900' : 'font-bold text-slate-600'}`}>{icon} {label}</span>
+      </div>
+      <span className={`text-sm font-black ${active ? 'text-emerald-600' : 'text-slate-400'}`}>+{price}€</span>
+    </label>
+  );
+}
