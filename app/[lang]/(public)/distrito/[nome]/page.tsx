@@ -1,7 +1,44 @@
-import { supabase } from "../../../../../lib/supabase";
+import { Metadata } from "next";
+import { supabase } from "@/lib/supabase";
 import Link from "next/link";
-import { getDictionary } from "../../../../../lib/getDictionary";
+import { getDictionary } from "@/lib/getDictionary";
 import BotaoFavorito from "../../components/BotaoFavorito";
+
+// 1. O CHEF DO SEO: Injeta os títulos e descrições dinâmicos para o Google
+export async function generateMetadata({ 
+  params 
+}: { 
+  params: Promise<{ lang: string; nome: string }> 
+}): Promise<Metadata> {
+  const { lang, nome } = await params;
+  const isEn = lang === 'en';
+  const nomeLimpo = decodeURIComponent(nome);
+
+  const { data: distrito } = await supabase
+    .from('distritos')
+    .select('seo_titulo, seo_descricao, seo_titulo_en, seo_descricao_en, nome, nome_en')
+    .ilike('nome', nomeLimpo)
+    .single();
+
+  if (!distrito) {
+    return { title: isEn ? 'District Not Found | HelloCamp' : 'Distrito Não Encontrado | HelloCamp' };
+  }
+
+  const title = isEn 
+    ? (distrito.seo_titulo_en || `Summer Camps in ${distrito.nome_en || distrito.nome} | HelloCamp`) 
+    : (distrito.seo_titulo || `Campos de Férias em ${distrito.nome} | HelloCamp`);
+    
+  const description = isEn ? distrito.seo_descricao_en : distrito.seo_descricao;
+
+  return {
+    title: title,
+    description: description,
+    openGraph: {
+      title: title,
+      description: description || '',
+    }
+  };
+}
 
 export default async function PaginaDoDistrito({ 
   params 
@@ -20,7 +57,6 @@ export default async function PaginaDoDistrito({
     .ilike('nome', nomeLimpo) 
     .single();
 
-  // FILTRO APLICADO: Só campos com contrato assinado
   const { data: camposNoDistrito } = await supabase
     .from('campos')
     .select('*')
@@ -29,60 +65,79 @@ export default async function PaginaDoDistrito({
 
   if (!distrito) {
     return (
-      <div style={{ display: 'flex', minHeight: '100vh', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f8fafc', textAlign: 'center', fontFamily: 'sans-serif' }}>
-        <h1 style={{ fontSize: '1.875rem', fontWeight: '800', color: '#064e3b' }}>
+      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 text-center font-sans px-4">
+        <h1 className="text-3xl font-black text-slate-900">
           {isEn ? 'District not found' : 'Não foi possível encontrar este distrito'} 🕵️‍♂️
         </h1>
-        <Link href={`/${lang}`} style={{ marginTop: '1rem', fontWeight: 'bold', color: '#059669' }}>
-          {isEn ? 'Back to home' : 'Voltar à página inicial'}
+        <Link href={`/${lang}`} className="mt-6 font-bold text-emerald-600 hover:text-emerald-700">
+          &larr; {isEn ? 'Back to home' : 'Voltar à página inicial'}
         </Link>
       </div>
     );
   }
 
   const nomeDistrito = isEn && distrito.nome_en ? distrito.nome_en : distrito.nome;
-  const descDistrito = isEn && distrito.descricao_curta_en ? distrito.descricao_curta_en : distrito.descricao_curta;
+  
+  // Usamos a descrição SEO para a página se existir (é mais rica), senão cai para a curta
+  const descDistritoLonga = isEn 
+    ? (distrito.seo_descricao_en || distrito.descricao_curta_en) 
+    : (distrito.seo_descricao || distrito.descricao_curta);
 
   return (
-    <main style={{ minHeight: '100vh', backgroundColor: '#f8fafc', color: '#111827', paddingBottom: '5rem' }}>
+    <main className="min-h-screen bg-slate-50 text-slate-900 font-sans">
       
-      {/* HEADER HERO DO DISTRITO */}
-      <div style={{ position: 'relative', width: '100%', height: '350px', backgroundColor: '#111827', overflow: 'hidden' }}>
-        <img src={distrito.imagem_capa} alt={nomeDistrito} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.85 }} />
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.1) 100%)' }}></div>
-
-        <div style={{ position: 'absolute', top: '24px', left: '24px', zIndex: 30 }}>
-          <Link href={`/${lang}`} style={{ backgroundColor: 'white', padding: '10px 20px', borderRadius: '999px', fontSize: '12px', fontWeight: 'bold', color: '#111', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', textDecoration: 'none' }}>
-            &larr; {isEn ? 'Back to home' : 'Voltar à página inicial'}
+      {/* 2. HEADER HERO DO DISTRITO (Design Editorial) */}
+      <section className="bg-white border-b border-slate-200 pt-10 pb-12 px-4 md:px-6">
+        <div className="max-w-[1100px] mx-auto">
+          <Link href={`/${lang}`} className="inline-block mb-6 text-xs font-bold text-slate-500 no-underline hover:text-emerald-600 transition-colors">
+            &larr; {isEn ? 'Back to Home' : 'Voltar ao Início'}
           </Link>
-        </div>
 
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 1.5rem', zIndex: 10, textAlign: 'center' }}>
-          <h1 style={{ fontSize: '3rem', fontWeight: '900', color: 'white', textTransform: 'capitalize', letterSpacing: '-0.02em' }}>{nomeDistrito}</h1>
-          <p style={{ marginTop: '1rem', fontSize: '1.125rem', fontWeight: '500', color: '#fcd34d', maxWidth: '42rem' }}>{descDistrito}</p>
+          <div className="flex flex-col md:flex-row gap-8 items-start md:items-center justify-between">
+            <div className="max-w-2xl">
+              <span className="block text-xs font-bold text-emerald-600 uppercase tracking-wider mb-2">
+                {isEn ? 'Destination Guide' : 'Guia de Destino'}
+              </span>
+              <h1 className="text-4xl md:text-5xl font-black text-slate-900 mb-4 tracking-tight capitalize">
+                {nomeDistrito}
+              </h1>
+              <p className="text-base md:text-lg text-slate-600 leading-relaxed font-medium">
+                {descDistritoLonga}
+              </p>
+            </div>
+            
+            <div className="w-full md:w-64 h-48 md:h-64 rounded-2xl overflow-hidden flex-shrink-0 shadow-lg shadow-slate-200/50 hidden sm:block">
+              <img src={distrito.imagem_capa} alt={nomeDistrito} className="w-full h-full object-cover" />
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
 
-      {/* LISTAGEM DE CAMPOS NO DISTRITO */}
-      <section style={{ maxWidth: '1100px', margin: '0 auto', padding: '4rem 1.5rem' }}>
-        <div style={{ marginBottom: '3rem' }}>
-          <h2 style={{ fontSize: '1.875rem', fontWeight: '800', color: '#064e3b' }}>
-            {isEn ? 'Available Camps' : 'Campos Disponíveis'}
-          </h2>
-          <p style={{ marginTop: '0.5rem', color: '#64748b', fontSize: '15px' }}>
-            {isEn ? 'Explore the options we selected for the district of' : 'Explore as opções que selecionámos para o distrito de'}
-            <span style={{ textTransform: 'capitalize', fontWeight: '600', color: '#334155' }}> {nomeDistrito}</span>.
-          </p>
+      {/* 3. LISTAGEM DE CAMPOS NO DISTRITO */}
+      <section className="max-w-[1100px] mx-auto px-4 py-12 md:py-16">
+        <div className="mb-10 flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">
+              {isEn ? 'Available Programs' : 'Programas Disponíveis'}
+            </h2>
+            <p className="mt-2 text-slate-500 text-sm md:text-base font-medium">
+              {isEn ? 'Explore the options we selected for' : 'Explore as opções que selecionámos para'}
+              <span className="capitalize font-bold text-slate-700"> {nomeDistrito}</span>.
+            </p>
+          </div>
+          <span className="hidden sm:inline-block text-sm font-bold text-slate-400 bg-slate-100 px-3 py-1 rounded-full">
+            {camposNoDistrito?.length || 0} {isEn ? 'found' : 'encontrados'}
+          </span>
         </div>
         
         {!camposNoDistrito || camposNoDistrito.length === 0 ? (
-          <div style={{ marginTop: '2rem', textAlign: 'center', backgroundColor: 'white', padding: '4rem 1.5rem', borderRadius: '1.5rem', border: '1px solid #f1f5f9' }}>
-            <p style={{ fontSize: '1.125rem', color: '#64748b', fontWeight: '500' }}>
+          <div className="text-center p-12 bg-white rounded-2xl border border-slate-200 shadow-sm">
+            <p className="text-lg text-slate-500 font-bold">
               {isEn ? 'There are no camps available for this district yet.' : 'Ainda não existem campos disponíveis para este distrito.'}
             </p>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
             {camposNoDistrito.map((campo: any, index: number) => {
               const campoId = campo.id !== undefined && campo.id !== null ? campo.id : (index + 1);
               const nomeCampo = isEn && campo.nome_en ? campo.nome_en : campo.nome;
@@ -91,37 +146,35 @@ export default async function PaginaDoDistrito({
               const precoVisivel = campo.preco || (campo.turnos && campo.turnos.length > 0 ? campo.turnos[0].preco : 0);
 
               return (
-                <div key={campoId} className="group" style={{ display: 'flex', flexDirection: 'column', backgroundColor: 'white', overflow: 'hidden', border: '1px solid #f1f5f9', borderRadius: '1.5rem', position: 'relative', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', transition: 'transform 0.2s' }}>
+                <div key={campoId} className="group flex flex-col bg-white rounded-2xl overflow-hidden border border-slate-200 relative shadow-sm hover:shadow-xl transition-all duration-300">
                   
-                  {/* LINK INVISÍVEL COBRE O CARTÃO INTEIRO (Resolve o clique nos telemóveis) */}
-                  <Link href={`/${lang}/campo/${campoId}`} style={{ position: 'absolute', inset: 0, zIndex: 10 }}>
+                  <Link href={`/${lang}/campo/${campoId}`} className="absolute inset-0 z-10">
                     <span className="sr-only">Explorar {nomeCampo}</span>
                   </Link>
 
-                  {/* BOTÃO DO CORAÇÃO FLUTUANTE (Nível acima do link para poder ser clicado) */}
-                  <div style={{ position: 'absolute', top: '1rem', right: '1rem', zIndex: 20 }}>
+                  <div className="absolute top-3 right-3 z-20">
                     <BotaoFavorito campoId={campoId} />
                   </div>
 
-                  <div style={{ position: 'relative', height: '250px', width: '100%', overflow: 'hidden' }}>
-                    <img src={campo.imagem} alt={nomeCampo} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    <div style={{ position: 'absolute', top: '1rem', left: '1rem', backgroundColor: '#059669', padding: '0.35rem 0.85rem', fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', color: 'white', borderRadius: '9999px', zIndex: 5 }}>
+                  <div className="relative h-56 w-full overflow-hidden bg-slate-100">
+                    <img src={campo.imagem} alt={nomeCampo} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                    <div className="absolute top-3 left-3 bg-emerald-600 px-3 py-1 text-xs font-bold uppercase text-white rounded-full z-0">
                       {catCampo}
                     </div>
                   </div>
                   
-                  <div style={{ display: 'flex', flexDirection: 'column', padding: '1.5rem', flex: 1, pointerEvents: 'none' }}>
-                    <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#047857', textTransform: 'uppercase' }}>
+                  <div className="flex flex-col p-5 flex-1 pointer-events-none">
+                    <span className="text-xs font-bold text-emerald-700 uppercase tracking-widest mb-1">
                       📍 {localCampo}
                     </span>
-                    <h3 style={{ marginTop: '0.5rem', fontSize: '1.25rem', fontWeight: '800', color: '#0f172a' }}>{nomeCampo}</h3>
-                    <p style={{ marginTop: '0.25rem', fontSize: '14px', color: '#64748b' }}>
-                      {isEn ? 'Age Group:' : 'Faixa Etária:'} {campo.idade}
+                    <h3 className="text-lg font-black text-slate-900 leading-tight mb-2">{nomeCampo}</h3>
+                    <p className="text-sm text-slate-500 font-medium mb-6">
+                      {isEn ? 'Age Group:' : 'Faixa Etária:'} <span className="text-slate-900">{campo.idade}</span>
                     </p>
                     
-                    <div style={{ marginTop: 'auto', paddingTop: '1.25rem', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', borderTop: '1px solid #f1f5f9' }}>
-                      <p style={{ fontSize: '1.5rem', fontWeight: '900', color: '#059669', margin: 0 }}>{precoVisivel}€</p>
-                      <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#f59e0b' }}>
+                    <div className="mt-auto pt-4 flex items-center justify-between border-t border-slate-100">
+                      <p className="text-xl font-black text-emerald-600 m-0">{precoVisivel}€</p>
+                      <span className="text-sm font-bold text-[#EBA914] transition-transform group-hover:translate-x-1">
                         {isEn ? 'Explore' : 'Explorar'} &rarr;
                       </span>
                     </div>
@@ -132,6 +185,27 @@ export default async function PaginaDoDistrito({
           </div>
         )}
       </section>
+
+      {/* 4. CROSS-LINKING (O Segredo do SEO) */}
+      <section className="bg-white border-t border-slate-200 py-16 px-4 md:px-6">
+         <div className="max-w-[1100px] mx-auto">
+            <h3 className="text-xl font-black text-slate-900 mb-6 capitalize">
+              {isEn ? `Explore more in ${nomeDistrito}` : `Explore mais em ${nomeDistrito}`}
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Link href={`/${lang}/pesquisa?distrito=${encodeURIComponent(distrito.nome)}&categoria=Desporto`} className="p-4 bg-slate-50 border border-slate-100 rounded-xl hover:border-emerald-500 transition-colors text-sm font-bold text-slate-700 no-underline">
+                ⚽ {isEn ? `Sports Camps in ${nomeDistrito}` : `Campos de Desporto em ${nomeDistrito}`}
+              </Link>
+              <Link href={`/${lang}/pesquisa?distrito=${encodeURIComponent(distrito.nome)}&categoria=Línguas`} className="p-4 bg-slate-50 border border-slate-100 rounded-xl hover:border-emerald-500 transition-colors text-sm font-bold text-slate-700 no-underline">
+                🗣️ {isEn ? `Language Camps in ${nomeDistrito}` : `Campos de Línguas em ${nomeDistrito}`}
+              </Link>
+              <Link href={`/${lang}/pesquisa?distrito=${encodeURIComponent(distrito.nome)}&categoria=Aventura & Natureza`} className="p-4 bg-slate-50 border border-slate-100 rounded-xl hover:border-emerald-500 transition-colors text-sm font-bold text-slate-700 no-underline">
+                🏕️ {isEn ? `Adventure Camps in ${nomeDistrito}` : `Campos de Aventura em ${nomeDistrito}`}
+              </Link>
+            </div>
+         </div>
+      </section>
+
     </main>
   );
 }
