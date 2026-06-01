@@ -4,7 +4,22 @@ import Link from "next/link";
 import { getDictionary } from "@/lib/getDictionary";
 import BotaoFavorito from "../../components/BotaoFavorito";
 
-// 1. O CHEF DO SEO
+// ARRAY DE IMAGENS DE FALLBACK (Para garantir que nunca aparecem imagens quebradas)
+const IMAGENS_DISTRITOS: Record<string, string> = {
+  "Lisboa": "https://images.unsplash.com/photo-1585208798174-6cedd86e019a?auto=format&fit=crop&q=80&w=1000",
+  "Porto": "https://images.unsplash.com/photo-1555881400-74d7acaacd8b?auto=format&fit=crop&q=80&w=1000",
+  "Faro": "https://images.unsplash.com/photo-1533556019545-21d7b322a46c?auto=format&fit=crop&q=80&w=1000",
+  "Braga": "https://images.unsplash.com/photo-1563806229-37330eb02d33?auto=format&fit=crop&q=80&w=1000",
+  "Setúbal": "https://images.unsplash.com/photo-1590500139707-1b0dff17be6c?auto=format&fit=crop&q=80&w=1000",
+  "Aveiro": "https://images.unsplash.com/photo-1627392683050-8b63e9f4eb8d?auto=format&fit=crop&q=80&w=1000",
+  "Coimbra": "https://images.unsplash.com/photo-1562947230-0eb5343d9229?auto=format&fit=crop&q=80&w=1000",
+  "Leiria": "https://images.unsplash.com/photo-1551221156-f56f2f9c572a?auto=format&fit=crop&q=80&w=1000",
+};
+
+// Imagem premium genérica caso seja um distrito sem foto mapeada
+const IMAGEM_GENERICA = "https://images.unsplash.com/photo-1596464716127-f2a82984de30?auto=format&fit=crop&q=80&w=1000";
+
+// 1. O CHEF DO SEO: Injeta os títulos e descrições dinâmicos para o Google
 export async function generateMetadata({ 
   params 
 }: { 
@@ -82,6 +97,11 @@ export default async function PaginaDoDistrito({
     ? (distrito.seo_descricao_en || distrito.descricao_curta_en) 
     : (distrito.seo_descricao || distrito.descricao_curta);
 
+  // Define a imagem final (Lógica do Fallback)
+  const imagemCapaFinal = distrito.imagem_capa && distrito.imagem_capa.trim() !== "" 
+    ? distrito.imagem_capa 
+    : (IMAGENS_DISTRITOS[distrito.nome] || IMAGEM_GENERICA);
+
   // SCHEMA MARKUP PARA BREADCRUMBS
   const baseUrl = "https://www.hellocamp.pt";
   const breadcrumbSchema = {
@@ -127,7 +147,7 @@ export default async function PaginaDoDistrito({
             </div>
             
             <div className="w-full md:w-64 h-48 md:h-64 rounded-2xl overflow-hidden flex-shrink-0 shadow-lg shadow-slate-200/50 hidden sm:block">
-              <img src={distrito.imagem_capa} alt={nomeDistrito} className="w-full h-full object-cover" />
+              <img src={imagemCapaFinal} alt={nomeDistrito} className="w-full h-full object-cover" />
             </div>
           </div>
         </div>
