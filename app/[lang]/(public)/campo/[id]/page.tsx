@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import CaixaReserva from "./CaixaReserva";
 import BotaoFavorito from "../../components/BotaoFavorito";
+import BotaoPartilha from "../../components/BotaoPartilha";
 import { getDictionary } from "@/lib/getDictionary";
 
 // 1. CHEF DO SEO PARA A PÁGINA DO CAMPO
@@ -88,6 +89,8 @@ export default async function DetalhesDoCampo({
   };
 
   const baseUrl = "https://www.hellocamp.pt";
+  const campoUrlCompleto = `${baseUrl}/${lang}/campo/${campo.id}`;
+
   const breadcrumbSchema = {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
@@ -95,7 +98,7 @@ export default async function DetalhesDoCampo({
       { "@type": "ListItem", "position": 1, "name": isEn ? "Home" : "Início", "item": `${baseUrl}/${lang}` },
       { "@type": "ListItem", "position": 2, "name": paisVisivel, "item": `${baseUrl}/${lang}/pesquisa/pais/${encodeURIComponent(paisReal)}` },
       { "@type": "ListItem", "position": 3, "name": localCampo, "item": `${baseUrl}/${lang}/distrito/${encodeURIComponent(campo.Distrito || localCampo)}` },
-      { "@type": "ListItem", "position": 4, "name": nomeCampo, "item": `${baseUrl}/${lang}/campo/${campo.id}` }
+      { "@type": "ListItem", "position": 4, "name": nomeCampo, "item": campoUrlCompleto }
     ]
   };
 
@@ -135,11 +138,13 @@ export default async function DetalhesDoCampo({
             
             {/* CABEÇALHO DO CAMPO E REVIEWS (z-40 para a Lightbox não ser bloqueada) */}
             <div className="bg-white p-8 md:p-10 rounded-3xl shadow-sm border border-slate-100 relative z-40">
-              <div className="absolute top-8 right-8 z-50">
+              {/* BOTÕES DE AÇÃO: FAVORITO E PARTILHAR */}
+              <div className="absolute top-8 right-8 z-50 flex items-center gap-3">
+                <BotaoPartilha url={campoUrlCompleto} titulo={nomeCampo} />
                 <BotaoFavorito campoId={campo.id} />
               </div>
               
-              <div className="flex flex-wrap items-center gap-3 mb-5 pr-12">
+              <div className="flex flex-wrap items-center gap-3 mb-5 pr-24">
                 <span className="rounded-full bg-emerald-50 border border-emerald-100 px-4 py-1.5 text-xs font-bold text-emerald-700 uppercase tracking-widest">{catCampo}</span>
                 <span className="text-sm font-bold text-slate-500">📍 {localCampo}</span>
               </div>
