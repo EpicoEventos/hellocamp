@@ -140,7 +140,8 @@ export default async function DetalhesDoCampo({
             <div className="bg-white p-8 md:p-10 rounded-3xl shadow-sm border border-slate-100 relative z-40">
               {/* BOTÕES DE AÇÃO: FAVORITO E PARTILHAR */}
               <div className="absolute top-8 right-8 z-50 flex items-center gap-3">
-                <BotaoPartilha url={campoUrlCompleto} titulo={nomeCampo} />
+                {/* AQUI ESTÁ A ALTERAÇÃO: Adicionado o isEn={isEn} */}
+                <BotaoPartilha url={campoUrlCompleto} titulo={nomeCampo} isEn={isEn} />
                 <BotaoFavorito campoId={campo.id} />
               </div>
               
