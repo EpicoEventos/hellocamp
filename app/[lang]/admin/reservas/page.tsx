@@ -4,19 +4,23 @@ import { useEffect, useState, use } from "react";
 import { supabase } from "@/lib/supabase";
 import React from "react";
 
-export default function ReservasParceiroAdvanced({ params }: { params: Promise<{ lang: string }> }) {
+export default function GestaoReservasParceiro({ params }: { params: Promise<{ lang: string }> }) {
   const { lang } = use(params);
   const isEn = lang === 'en';
 
   const [loading, setLoading] = useState(true);
   const [campoGrupos, setCampoGrupos] = useState<any[]>([]);
   const [filtroCampoId, setFiltroCampoId] = useState<string>('todos');
+  
+  // Estado para a Ficha Detalhada (Modal)
+  const [reservaSelecionada, setReservaSelecionada] = useState<any>(null);
 
   useEffect(() => {
     const fetchDadosInscritos = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
+      // Busca os campos E as reservas, E as crianças, E os pais... tudo numa query!
       const { data: camposData, error } = await supabase
         .from('campos')
         .select(`
@@ -35,6 +39,9 @@ export default function ReservasParceiroAdvanced({ params }: { params: Promise<{
             status_pagamento,
             criancas (
               nome, nif, data_nascimento, sexo, restricoes_alimentares
+            ),
+            perfis (
+              nome_completo, email, telefone, nif, contacto_emergencia, pessoas_autorizadas_recolha
             )
           )
         `)
@@ -51,7 +58,9 @@ export default function ReservasParceiroAdvanced({ params }: { params: Promise<{
             dataReserva: reserva.created_at,
             statusPagamento: reserva.status_pagamento || 'Pendente',
             extras: reserva.extras_escolhidos,
-            crianca: reserva.criancas
+            crianca: Array.isArray(reserva.criancas) ? reserva.criancas[0] : reserva.criancas,
+            pai: Array.isArray(reserva.perfis) ? reserva.perfis[0] : reserva.perfis,
+            campNome: isEn && c.nome_en ? c.nome_en : c.nome
           }));
 
           const realVagasTotais = c.turnos && c.turnos.length > 0
@@ -114,18 +123,15 @@ export default function ReservasParceiroAdvanced({ params }: { params: Promise<{
   if (filtroCampoId === 'todos') {
     campoGrupos.forEach(g => {
       vagasTotaisExibidas += g.vagas_totais;
-      inscritosRows = [...inscritosRows, ...g.inscritos.map((i: any) => ({ ...i, campNome: g.nome }))];
+      inscritosRows = [...inscritosRows, ...g.inscritos];
     });
   } else {
     const grupoSelecao = campoGrupos.find(g => g.id === filtroCampoId);
     if (grupoSelecao) {
       vagasTotaisExibidas = grupoSelecao.vagas_totais;
       campoNomeFicheiro = grupoSelecao.nome.toLowerCase().replace(/\s+/g, '_');
-      inscritosRows = grupoSelecao.inscritos.map((i: any) => ({ ...i, campNome: grupoSelecao.nome }));
-      
-      if (!grupoSelecao.contratoUrl) {
-        contextoContratoOculto = true;
-      }
+      inscritosRows = [...grupoSelecao.inscritos];
+      if (!grupoSelecao.contratoUrl) contextoContratoOculto = true;
     }
   }
 
@@ -151,11 +157,14 @@ export default function ReservasParceiroAdvanced({ params }: { params: Promise<{
       return;
     }
 
-    let conteudoCsv = "Campo;Turno;Nome Criança;Idade;Sexo;NIF;Alergias/Restrições;Valor;Estado Pagamento;Data/Hora Inscrição\n";
+    let conteudoCsv = "Campo;Turno;Nome Crianca;Idade;Sexo;NIF;Alergias/Restricoes;Encarregado;Telefone;Valor;Estado Pagamento;Data/Hora Inscricao\n";
     inscritosRows.forEach((item: any) => {
       const cAlergias = temAlertaMedico(item.crianca?.restricoes_alimentares) ? item.crianca.restricoes_alimentares.replace(/;/g, ",") : "Nenhuma";
       const cData = new Date(item.dataReserva).toLocaleString('pt-PT');
-      conteudoCsv += `${item.campNome};${item.turno};${item.crianca?.nome || ""};${item.crianca?.data_nascimento ? obterIdade(item.crianca.data_nascimento) : ""};${item.crianca?.sexo || ""};${item.crianca?.nif || ""};${cAlergias};${item.valor}€;${item.statusPagamento};${cData}\n`;
+      const paiNome = item.pai?.nome_completo || "N/A";
+      const paiTel = item.pai?.telefone || "N/A";
+
+      conteudoCsv += `${item.campNome};${item.turno};${item.crianca?.nome || ""};${item.crianca?.data_nascimento ? obterIdade(item.crianca.data_nascimento) : ""};${item.crianca?.sexo || ""};${item.crianca?.nif || ""};${cAlergias};${paiNome};${paiTel};${item.valor}€;${item.statusPagamento};${cData}\n`;
     });
 
     const blob = new Blob(["\ufeff" + conteudoCsv], { type: "text/csv;charset=utf-8;" });
@@ -167,10 +176,10 @@ export default function ReservasParceiroAdvanced({ params }: { params: Promise<{
     document.body.removeChild(link);
   };
 
-  if (loading) return <div style={{ padding: '3rem', textAlign: 'center', fontWeight: 'bold' }}>A carregar painel avançado...</div>;
+  if (loading) return <div style={{ padding: '4rem', textAlign: 'center', color: '#64748b', fontWeight: 'bold' }}>{isEn ? 'Loading dashboard...' : 'A carregar painel avançado...'}</div>;
 
   return (
-    <div style={{ fontFamily: 'sans-serif', paddingBottom: '3rem' }}>
+    <div style={{ fontFamily: 'sans-serif', paddingBottom: '4rem', maxWidth: '1200px', margin: '0 auto', padding: '2rem 1.5rem' }}>
       
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '2.5rem', flexWrap: 'wrap', gap: '1.5rem' }}>
         <div>
@@ -255,14 +264,14 @@ export default function ReservasParceiroAdvanced({ params }: { params: Promise<{
               </div>
             </div>
             <div>
-              <span style={analyticsLabelStyle}>{isEn ? 'AVERAGE AGE' : 'MÉDIA DE IDADES DO FILTRO'}</span>
+              <span style={analyticsLabelStyle}>{isEn ? 'AVERAGE AGE' : 'MÉDIA DE IDADES'}</span>
               <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#0f172a', marginTop: '0.5rem' }}>
                 📅 {mediaIdades} anos de média
               </div>
             </div>
           </div>
 
-          <div style={{ backgroundColor: 'white', borderRadius: '1.25rem', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+          <div style={{ backgroundColor: 'white', borderRadius: '1.25rem', border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
             <div style={{ padding: '1.25rem 1.5rem', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '800', color: '#334155', textTransform: 'uppercase' }}>{isEn ? 'NOMINAL ROSTER' : 'LISTA NOMINAL DE PARTICIPANTES FILTRADA'}</h3>
               <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 'bold' }}>{inscritosCount} Registos Detetados</span>
@@ -281,20 +290,20 @@ export default function ReservasParceiroAdvanced({ params }: { params: Promise<{
                       <th style={thStyle}>{isEn ? 'AGE' : 'IDADE'}</th>
                       <th style={thStyle}>{isEn ? 'HEALTH/DIET' : 'RESTRIÇÕES DE SAÚDE'}</th>
                       <th style={thStyle}>{isEn ? 'SHIFT' : 'TURNO'}</th>
-                      <th style={thStyle}>{isEn ? 'DATE' : 'DATA E HORA (INSCRIÇÃO)'}</th>
+                      <th style={thStyle}>{isEn ? 'GUARDIAN' : 'ENCARREGADO'}</th>
                       <th style={thStyle}>{isEn ? 'PAYMENT' : 'ESTADO'}</th>
+                      <th style={thStyle}>{isEn ? 'ACTIONS' : 'AÇÕES'}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {inscritosRows.map((item: any, idx: number) => {
                       const alertaVerdadeiro = temAlertaMedico(item.crianca?.restricoes_alimentares);
-                      const dataFormatada = new Date(item.dataReserva);
                       
                       return (
                         <tr key={idx} style={{ borderBottom: idx !== inscritosRows.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
                           <td style={tdStyle}>
-                            <div style={{ fontWeight: 'bold', color: '#0f172a' }}>{item.crianca?.nome}</div>
-                            <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>🏕️ {item.campNome} | NIF: {item.crianca?.nif || 'N/A'}</div>
+                            <div style={{ fontWeight: 'bold', color: '#0f172a' }}>{item.crianca?.nome || 'N/A'}</div>
+                            <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>🏕️ {item.campNome}</div>
                           </td>
                           <td style={tdStyle}>{item.crianca?.data_nascimento ? `${obterIdade(item.crianca.data_nascimento)} anos` : '-'}</td>
                           <td style={tdStyle}>
@@ -309,8 +318,9 @@ export default function ReservasParceiroAdvanced({ params }: { params: Promise<{
                           <td style={{ ...tdStyle, fontWeight: '600' }}>
                             {item.turno} <div style={{ fontSize: '11px', color: '#059669' }}>{item.valor}€</div>
                           </td>
-                          <td style={{ ...tdStyle, color: '#64748b', fontSize: '13px' }}>
-                            <strong>{dataFormatada.toLocaleDateString('pt-PT')}</strong> às {dataFormatada.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
+                          <td style={tdStyle}>
+                            <div style={{ color: '#334155', fontWeight: '600' }}>{item.pai?.nome_completo || 'Sem Nome'}</div>
+                            <div style={{ fontSize: '11px', color: '#64748b' }}>{item.pai?.telefone || '-'}</div>
                           </td>
                           <td style={tdStyle}>
                             <button 
@@ -326,6 +336,11 @@ export default function ReservasParceiroAdvanced({ params }: { params: Promise<{
                               {item.statusPagamento}
                             </button>
                           </td>
+                          <td style={tdStyle}>
+                            <button onClick={() => setReservaSelecionada(item)} style={{ padding: '0.5rem 1rem', backgroundColor: '#f1f5f9', color: '#0f172a', border: '1px solid #cbd5e1', borderRadius: '0.5rem', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px' }}>
+                              {isEn ? 'View Details' : 'Ver Ficha'}
+                            </button>
+                          </td>
                         </tr>
                       );
                     })}
@@ -334,16 +349,100 @@ export default function ReservasParceiroAdvanced({ params }: { params: Promise<{
               )}
             </div>
           </div>
+        </div>
+      )}
 
+      {/* O MODAL COM A FICHA COMPLETA (HERDADO DA VISTA BÁSICA) */}
+      {reservaSelecionada && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.8)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', backdropFilter: 'blur(4px)' }}>
+          <div style={{ backgroundColor: 'white', width: '100%', maxWidth: '800px', borderRadius: '1.5rem', overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column', maxHeight: '90vh' }}>
+            
+            <div style={{ padding: '1.5rem 2rem', backgroundColor: '#0f172a', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: '900' }}>{isEn ? 'Booking Details' : 'Ficha de Inscrição'}</h2>
+                <p style={{ margin: '0.25rem 0 0 0', color: '#94a3b8', fontSize: '14px' }}>Ref: {reservaSelecionada.reservaId}</p>
+              </div>
+              <button onClick={() => setReservaSelecionada(null)} style={{ background: 'none', border: 'none', color: 'white', fontSize: '2rem', cursor: 'pointer', lineHeight: 1 }}>&times;</button>
+            </div>
+
+            <div style={{ padding: '2rem', overflowY: 'auto', backgroundColor: '#f8fafc' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem' }}>
+                
+                <div style={modalCardStyle}>
+                  <h3 style={modalTitleStyle}>👦 {isEn ? 'Participant Data' : 'Dados do Participante'}</h3>
+                  <DetailRow label={isEn ? "Name" : "Nome"} value={reservaSelecionada.crianca?.nome} />
+                  <DetailRow label={isEn ? "Birth Date" : "Data Nasc."} value={reservaSelecionada.crianca?.data_nascimento} />
+                  <DetailRow label={isEn ? "Gender" : "Género"} value={reservaSelecionada.crianca?.sexo} />
+                  <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: '#fff7ed', borderRadius: '0.5rem', border: '1px solid #fed7aa' }}>
+                    <span style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#c2410c', textTransform: 'uppercase', marginBottom: '0.25rem' }}>{isEn ? 'Allergies / Restrictions' : 'Alergias / Restrições'}</span>
+                    <span style={{ fontSize: '14px', color: '#9a3412', fontWeight: 'bold' }}>{reservaSelecionada.crianca?.restricoes_alimentares || (isEn ? 'None declared' : 'Nenhuma declarada')}</span>
+                  </div>
+                </div>
+
+                <div style={modalCardStyle}>
+                  <h3 style={modalTitleStyle}>🛡️ {isEn ? 'Security & Contacts (Guardian)' : 'Segurança e Contactos (Pai/Mãe)'}</h3>
+                  <DetailRow label={isEn ? "Guardian" : "Encarregado"} value={reservaSelecionada.pai?.nome_completo} />
+                  <DetailRow label={isEn ? "Phone" : "Telemóvel"} value={reservaSelecionada.pai?.telefone} />
+                  <DetailRow label="Email" value={reservaSelecionada.pai?.email} />
+                  <DetailRow label="NIF" value={reservaSelecionada.pai?.nif || (isEn ? 'Not provided' : 'Não fornecido')} />
+                  
+                  <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: '#fef2f2', borderRadius: '0.5rem', border: '1px solid #fecaca' }}>
+                    <span style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#e11d48', textTransform: 'uppercase', marginBottom: '0.25rem' }}>{isEn ? 'Emergency Contact (Alt.)' : 'Contacto de Emergência (Alt.)'}</span>
+                    <span style={{ fontSize: '14px', color: '#9f1239', fontWeight: 'bold' }}>{reservaSelecionada.pai?.contacto_emergencia || (isEn ? '⚠️ Missing Data' : '⚠️ Faltam Dados')}</span>
+                  </div>
+
+                  <div style={{ marginTop: '0.5rem', padding: '1rem', backgroundColor: '#f0fdf4', borderRadius: '0.5rem', border: '1px solid #bbf7d0' }}>
+                    <span style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#059669', textTransform: 'uppercase', marginBottom: '0.25rem' }}>{isEn ? 'Authorized Pickup Persons' : 'Autorizados a Levantar'}</span>
+                    <span style={{ fontSize: '14px', color: '#064e3b', fontWeight: '600', whiteSpace: 'pre-wrap' }}>{reservaSelecionada.pai?.pessoas_autorizadas_recolha || (isEn ? '⚠️ Missing Data' : '⚠️ Faltam Dados')}</span>
+                  </div>
+                </div>
+
+                <div style={{ ...modalCardStyle, gridColumn: '1 / -1' }}>
+                  <h3 style={modalTitleStyle}>📅 {isEn ? 'Program Details' : 'Detalhes do Programa'}</h3>
+                  <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
+                    <div style={{ flex: 1 }}>
+                      <DetailRow label={isEn ? "Program" : "Campo"} value={reservaSelecionada.campNome} />
+                      <DetailRow label={isEn ? "Shift" : "Turno"} value={reservaSelecionada.turno} />
+                      <DetailRow label={isEn ? "Effective Days" : "Dias Efetivos"} value={reservaSelecionada.extras?.dias_inscritos || (isEn ? 'Full Week' : 'Semana Completa')} />
+                      <DetailRow label={isEn ? "Financial Status" : "Estado Financeiro"} value={reservaSelecionada.statusPagamento === 'Pago' ? (isEn ? 'Paid' : 'Pago') : (isEn ? 'Pending' : 'Pendente')} />
+                    </div>
+                    <div style={{ flex: 1, backgroundColor: '#f1f5f9', padding: '1rem', borderRadius: '0.5rem' }}>
+                      <span style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', marginBottom: '0.5rem' }}>{isEn ? 'Extras Contracted:' : 'Extras Contratados:'}</span>
+                      <ul style={{ margin: 0, paddingLeft: '1.25rem', fontSize: '14px', color: '#334155', fontWeight: '600' }}>
+                        {reservaSelecionada.extras?.extAlimentacao ? <li>{isEn ? 'Meals Included' : 'Refeições Incluídas'}</li> : null}
+                        {reservaSelecionada.extras?.extAlojamento ? <li>{isEn ? 'Accommodation' : 'Alojamento/Dormida'}</li> : null}
+                        {reservaSelecionada.extras?.extTransporte ? <li>{isEn ? 'Transport' : 'Transporte'}</li> : null}
+                        {reservaSelecionada.extras?.extProlongamento ? <li>{isEn ? 'Extended Hours' : 'Prolongamento de Horário'}</li> : null}
+                        {!reservaSelecionada.extras?.extAlimentacao && !reservaSelecionada.extras?.extAlojamento && !reservaSelecionada.extras?.extTransporte && !reservaSelecionada.extras?.extProlongamento && <li>{isEn ? 'No extras selected' : 'Nenhum extra selecionado'}</li>}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+          </div>
         </div>
       )}
     </div>
   );
 }
 
+// ESTILOS DE COMPONENTES
 const statCardStyle = { display: 'flex', flexDirection: 'column' as const, gap: '0.25rem', backgroundColor: 'white', padding: '1.5rem', borderRadius: '1rem', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' };
 const statLabelStyle = { fontSize: '11px', fontWeight: '800', color: '#64748b', letterSpacing: '0.05em' };
 const analyticsLabelStyle = { fontSize: '11px', fontWeight: '800', color: '#94a3b8', letterSpacing: '0.05em' };
 const thStyle = { padding: '1rem 1.5rem', fontSize: '11px', fontWeight: '800', color: '#475569', letterSpacing: '0.05em' };
 const tdStyle = { padding: '1.25rem 1.5rem', color: '#334155', verticalAlign: 'middle' };
 const selectDropdownStyle = { width: '100%', padding: '0.875rem 1rem', borderRadius: '0.75rem', border: '1px solid #a7f3d0', backgroundColor: '#f0fdf4', color: '#064e3b', fontWeight: '800', fontSize: '14px', outline: 'none', appearance: 'none' as const, cursor: 'pointer', backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23064e3b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1.2em' };
+
+const modalCardStyle = { backgroundColor: 'white', padding: '1.5rem', borderRadius: '1rem', border: '1px solid #e2e8f0', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' };
+const modalTitleStyle = { margin: '0 0 1.5rem 0', fontSize: '1.125rem', fontWeight: '900', color: '#0f172a', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.5rem' };
+
+const DetailRow = ({ label, value }: { label: string, value: string }) => (
+  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem', borderBottom: '1px dashed #f1f5f9', paddingBottom: '0.25rem' }}>
+    <span style={{ fontSize: '13px', color: '#64748b', fontWeight: 'bold' }}>{label}:</span>
+    <span style={{ fontSize: '14px', color: '#0f172a', fontWeight: '700', textAlign: 'right' }}>{value || 'N/A'}</span>
+  </div>
+);
