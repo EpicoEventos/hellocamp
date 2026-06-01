@@ -88,13 +88,20 @@ export default function MeusCampos({ params }: { params: Promise<{ lang: string 
                   </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row gap-3 mt-2 lg:mt-0 w-full lg:w-auto">
+                <div className="flex flex-col sm:flex-row flex-wrap justify-end gap-3 mt-4 lg:mt-0 w-full lg:w-auto">
+                  
+                  {/* NOVO BOTÃO: Preview (Ver Campo Online) */}
+                  <a href={`/${lang}/campo/${campo.id}`} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 rounded-lg font-bold text-sm no-underline transition-colors">
+                    👁️ {isEn ? 'Preview' : 'Ver Online'}
+                  </a>
+
                   {campo.contrato_parceiro_url && (
-                    <a href={campo.contrato_parceiro_url} target="_blank" rel="noopener noreferrer" className="text-center px-4 py-2.5 bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 rounded-lg font-bold text-sm no-underline transition-colors">
+                    <a href={campo.contrato_parceiro_url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center px-4 py-2.5 bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 rounded-lg font-bold text-sm no-underline transition-colors">
                       {isEn ? 'Download Contract' : '📥 Contrato'}
                     </a>
                   )}
-                  <Link href={`/${lang}/admin/campos/editar/${campo.id}`} className="text-center px-6 py-2.5 bg-slate-900 text-white hover:bg-slate-800 rounded-lg font-bold text-sm no-underline transition-colors">
+                  
+                  <Link href={`/${lang}/admin/campos/editar/${campo.id}`} className="flex items-center justify-center px-6 py-2.5 bg-slate-900 text-white hover:bg-slate-800 rounded-lg font-bold text-sm no-underline transition-colors">
                     {isEn ? 'Edit Camp' : 'Editar Campo'}
                   </Link>
                 </div>
