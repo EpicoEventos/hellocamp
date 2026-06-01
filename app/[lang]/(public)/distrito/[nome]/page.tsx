@@ -4,7 +4,7 @@ import Link from "next/link";
 import { getDictionary } from "@/lib/getDictionary";
 import BotaoFavorito from "../../components/BotaoFavorito";
 
-// 1. O CHEF DO SEO: Injeta os títulos e descrições dinâmicos para o Google
+// 1. O CHEF DO SEO
 export async function generateMetadata({ 
   params 
 }: { 
@@ -78,24 +78,44 @@ export default async function PaginaDoDistrito({
 
   const nomeDistrito = isEn && distrito.nome_en ? distrito.nome_en : distrito.nome;
   
-  // Usamos a descrição SEO para a página se existir (é mais rica), senão cai para a curta
   const descDistritoLonga = isEn 
     ? (distrito.seo_descricao_en || distrito.descricao_curta_en) 
     : (distrito.seo_descricao || distrito.descricao_curta);
 
+  // SCHEMA MARKUP PARA BREADCRUMBS
+  const baseUrl = "https://www.hellocamp.pt";
+  const breadcrumbSchema = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": isEn ? "Home" : "Início", "item": `${baseUrl}/${lang}` },
+      { "@type": "ListItem", "position": 2, "name": "Portugal", "item": `${baseUrl}/${lang}/pesquisa/pais/Portugal` },
+      { "@type": "ListItem", "position": 3, "name": nomeDistrito, "item": `${baseUrl}/${lang}/distrito/${encodeURIComponent(nomeLimpo)}` }
+    ]
+  };
+
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900 font-sans">
       
-      {/* 2. HEADER HERO DO DISTRITO (Design Editorial) */}
-      <section className="bg-white border-b border-slate-200 pt-10 pb-12 px-4 md:px-6">
+      {/* SCRIPT SEO INVISÍVEL */}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }} />
+
+      {/* 2. HEADER HERO DO DISTRITO */}
+      <section className="bg-white border-b border-slate-200 pt-8 pb-12 px-4 md:px-6">
         <div className="max-w-[1100px] mx-auto">
-          <Link href={`/${lang}`} className="inline-block mb-6 text-xs font-bold text-slate-500 no-underline hover:text-emerald-600 transition-colors">
-            &larr; {isEn ? 'Back to Home' : 'Voltar ao Início'}
-          </Link>
+          
+          {/* BREADCRUMBS VISUAIS */}
+          <nav className="flex items-center gap-2 text-xs font-bold text-slate-400 mb-6 tracking-wider uppercase">
+            <Link href={`/${lang}`} className="hover:text-emerald-600 transition-colors">{isEn ? 'Home' : 'Início'}</Link>
+            <span>/</span>
+            <Link href={`/${lang}/pesquisa/pais/Portugal`} className="hover:text-emerald-600 transition-colors">Portugal</Link>
+            <span>/</span>
+            <span className="text-slate-600">{nomeDistrito}</span>
+          </nav>
 
           <div className="flex flex-col md:flex-row gap-8 items-start md:items-center justify-between">
             <div className="max-w-2xl">
-              <span className="block text-xs font-bold text-emerald-600 uppercase tracking-wider mb-2">
+              <span className="block text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-2">
                 {isEn ? 'Destination Guide' : 'Guia de Destino'}
               </span>
               <h1 className="text-4xl md:text-5xl font-black text-slate-900 mb-4 tracking-tight capitalize">
@@ -186,20 +206,20 @@ export default async function PaginaDoDistrito({
         )}
       </section>
 
-      {/* 4. CROSS-LINKING (O Segredo do SEO) */}
+      {/* 4. CROSS-LINKING */}
       <section className="bg-white border-t border-slate-200 py-16 px-4 md:px-6">
          <div className="max-w-[1100px] mx-auto">
             <h3 className="text-xl font-black text-slate-900 mb-6 capitalize">
               {isEn ? `Explore more in ${nomeDistrito}` : `Explore mais em ${nomeDistrito}`}
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Link href={`/${lang}/pesquisa?distrito=${encodeURIComponent(distrito.nome)}&categoria=Desporto`} className="p-4 bg-slate-50 border border-slate-100 rounded-xl hover:border-emerald-500 transition-colors text-sm font-bold text-slate-700 no-underline">
+              <Link href={`/${lang}/pesquisa?distrito=${encodeURIComponent(distrito.nome)}&categoria=Desporto`} className="p-4 bg-slate-50 border border-slate-200 rounded-xl hover:border-emerald-500 transition-colors text-sm font-bold text-slate-700 no-underline flex items-center gap-2 shadow-sm hover:shadow-md">
                 ⚽ {isEn ? `Sports Camps in ${nomeDistrito}` : `Campos de Desporto em ${nomeDistrito}`}
               </Link>
-              <Link href={`/${lang}/pesquisa?distrito=${encodeURIComponent(distrito.nome)}&categoria=Línguas`} className="p-4 bg-slate-50 border border-slate-100 rounded-xl hover:border-emerald-500 transition-colors text-sm font-bold text-slate-700 no-underline">
+              <Link href={`/${lang}/pesquisa?distrito=${encodeURIComponent(distrito.nome)}&categoria=Línguas`} className="p-4 bg-slate-50 border border-slate-200 rounded-xl hover:border-emerald-500 transition-colors text-sm font-bold text-slate-700 no-underline flex items-center gap-2 shadow-sm hover:shadow-md">
                 🗣️ {isEn ? `Language Camps in ${nomeDistrito}` : `Campos de Línguas em ${nomeDistrito}`}
               </Link>
-              <Link href={`/${lang}/pesquisa?distrito=${encodeURIComponent(distrito.nome)}&categoria=Aventura & Natureza`} className="p-4 bg-slate-50 border border-slate-100 rounded-xl hover:border-emerald-500 transition-colors text-sm font-bold text-slate-700 no-underline">
+              <Link href={`/${lang}/pesquisa?distrito=${encodeURIComponent(distrito.nome)}&categoria=Aventura & Natureza`} className="p-4 bg-slate-50 border border-slate-200 rounded-xl hover:border-emerald-500 transition-colors text-sm font-bold text-slate-700 no-underline flex items-center gap-2 shadow-sm hover:shadow-md">
                 🏕️ {isEn ? `Adventure Camps in ${nomeDistrito}` : `Campos de Aventura em ${nomeDistrito}`}
               </Link>
             </div>

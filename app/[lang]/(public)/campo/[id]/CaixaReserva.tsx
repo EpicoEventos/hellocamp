@@ -90,6 +90,10 @@ export default function CaixaReserva({ campo, lang, dict }: { campo: any, lang: 
 
   const disabledReserva = !temTurnos || precoBase === 0;
 
+  // VERIFICAÇÃO DE ESCASSEZ (SCARCITY)
+  const vagasTurno = turnoSelecionado ? Number(turnoSelecionado.vagas) : 0;
+  const mostrarEscassez = turnoSelecionado && vagasTurno > 0 && vagasTurno <= 3;
+
   return (
     <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-xl shadow-slate-200/50 sticky top-8 w-full">
       
@@ -172,12 +176,20 @@ export default function CaixaReserva({ campo, lang, dict }: { campo: any, lang: 
         </div>
       </div>
 
-      {/* TOTAL E BOTÃO */}
+      {/* TOTAL */}
       <div className="bg-slate-50 p-6 rounded-2xl mb-6 flex justify-between items-center border border-slate-100">
         <span className="text-lg font-black text-slate-900">Total</span>
         <span className="text-3xl font-black text-emerald-600">{precoTotal}€</span>
       </div>
 
+      {/* ESCASSEZ ELEGANTE (Apenas visível se vagas <= 3) */}
+      {mostrarEscassez && (
+        <p className="text-center text-sm font-black text-red-500 mb-3 animate-pulse">
+          🔥 {isEn ? `Only ${vagasTurno} spots left in this shift!` : `Apenas ${vagasTurno} vagas restantes neste turno!`}
+        </p>
+      )}
+
+      {/* BOTÃO DE RESERVA */}
       <button 
         onClick={handleReservar} 
         disabled={disabledReserva} 
@@ -185,6 +197,16 @@ export default function CaixaReserva({ campo, lang, dict }: { campo: any, lang: 
       >
         {isEn ? 'Book Spot Now' : 'Reservar Vaga Agora'}
       </button>
+
+      {/* SELOS DE CONFIANÇA (TRUST BADGES) */}
+      <div className="flex items-center justify-center gap-5 mt-5 pt-4 border-t border-slate-100">
+        <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+          <span className="text-base leading-none">🛡️</span> {isEn ? 'Free Cancelation*' : 'Cancelamento Gratuito*'}
+        </div>
+        <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+          <span className="text-base leading-none">🔒</span> {isEn ? 'Secure Payment' : 'Pagamento Seguro'}
+        </div>
+      </div>
       
       {disabledReserva && (
         <p className="text-center text-xs text-red-500 mt-4 font-bold">

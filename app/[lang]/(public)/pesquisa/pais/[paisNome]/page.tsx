@@ -1,7 +1,7 @@
 import { Metadata } from "next";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
-import BotaoFavorito from "../../../components/BotaoFavorito";
+import BotaoFavorito from "../../../components/BotaoFavorito"; // Importe ajustado de acordo com as suas pastas
 
 // 1. O CHEF DO SEO
 export async function generateMetadata({ 
@@ -91,15 +91,36 @@ export default async function PesquisaPorPais({
 
   const distritosPT = ["Aveiro", "Beja", "Braga", "Bragança", "Castelo Branco", "Coimbra", "Évora", "Faro", "Guarda", "Leiria", "Lisboa", "Portalegre", "Porto", "Santarém", "Setúbal", "Viana do Castelo", "Vila Real", "Viseu"];
 
+  // SCHEMA MARKUP PARA BREADCRUMBS
+  const baseUrl = "https://www.hellocamp.pt";
+  const breadcrumbSchema = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": isEn ? "Home" : "Início", "item": `${baseUrl}/${lang}` },
+      { "@type": "ListItem", "position": 2, "name": isEn ? "Countries" : "Países", "item": `${baseUrl}/${lang}/pesquisa` },
+      { "@type": "ListItem", "position": 3, "name": nomePaisApresentar, "item": `${baseUrl}/${lang}/pesquisa/pais/${encodeURIComponent(nomePaisInicial)}` }
+    ]
+  };
+
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-20">
       
-      {/* 1. CABEÇALHO EDITORIAL (REDUZIDO E MAIS ELEGANTE) */}
+      {/* SCRIPT SEO INVISÍVEL */}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }} />
+
+      {/* 1. CABEÇALHO EDITORIAL */}
       <section className="bg-white pt-8 pb-8 px-4 md:px-6">
         <div className="max-w-[1100px] mx-auto">
-          <Link href={`/${lang}`} className="inline-block mb-4 text-xs font-bold text-slate-400 no-underline hover:text-emerald-600 transition-colors">
-            &larr; {isEn ? 'Back to Home' : 'Voltar ao Início'}
-          </Link>
+          
+          {/* BREADCRUMBS VISUAIS */}
+          <nav className="flex items-center gap-2 text-xs font-bold text-slate-400 mb-4 tracking-wider uppercase">
+            <Link href={`/${lang}`} className="hover:text-emerald-600 transition-colors">{isEn ? 'Home' : 'Início'}</Link>
+            <span>/</span>
+            <Link href={`/${lang}/pesquisa`} className="hover:text-emerald-600 transition-colors">{isEn ? 'Countries' : 'Países'}</Link>
+            <span>/</span>
+            <span className="text-slate-600">{nomePaisApresentar}</span>
+          </nav>
 
           <div className="flex flex-col md:flex-row gap-6 items-start md:items-center justify-between">
             <div className="max-w-3xl">
@@ -117,12 +138,12 @@ export default async function PesquisaPorPais({
         </div>
       </section>
 
-      {/* 2. BARRA DE FILTROS (TEMA CLARO IGUAL AO RESTO DO SITE) */}
+      {/* 2. BARRA DE FILTROS */}
       <section className="bg-white border-y border-slate-200 py-4 px-4 md:px-6 sticky top-[72px] md:top-[80px] z-30 shadow-sm">
         <div className="max-w-[1100px] mx-auto">
           <form action={`/${lang}/pesquisa/pais/${encodeURIComponent(nomePaisInicial)}`} method="GET" className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 items-center">
             
-            <select name="categoria" defaultValue={categoriaParam} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 outline-none appearance-none cursor-pointer focus:border-emerald-500 focus:bg-white transition-colors" style={{ backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1em' }}>
+            <select name="categoria" defaultValue={categoriaParam} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 outline-none appearance-none cursor-pointer focus:border-emerald-500 focus:bg-white transition-colors" style={{ backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1em' }}>
               <option value="">{isEn ? 'All Categories' : 'Todas as Categorias'}</option>
               <option value="Desporto">{isEn ? 'Sports' : 'Desporto'}</option>
               <option value="Aventura & Natureza">{isEn ? 'Adventure' : 'Aventura & Natureza'}</option>
@@ -132,13 +153,13 @@ export default async function PesquisaPorPais({
             </select>
 
             {mostrarDistritos && (
-              <select name="distrito" defaultValue={distritoParam} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 outline-none appearance-none cursor-pointer focus:border-emerald-500 focus:bg-white transition-colors" style={{ backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1em' }}>
+              <select name="distrito" defaultValue={distritoParam} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 outline-none appearance-none cursor-pointer focus:border-emerald-500 focus:bg-white transition-colors" style={{ backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1em' }}>
                 <option value="">{isEn ? 'All Districts' : 'Todos os Distritos'}</option>
                 {distritosPT.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
             )}
 
-            <select name="idade" defaultValue={idadeParam} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 outline-none appearance-none cursor-pointer focus:border-emerald-500 focus:bg-white transition-colors" style={{ backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1em' }}>
+            <select name="idade" defaultValue={idadeParam} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 outline-none appearance-none cursor-pointer focus:border-emerald-500 focus:bg-white transition-colors" style={{ backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1em' }}>
               <option value="">{isEn ? 'All Ages' : 'Todas as Idades'}</option>
               <option value="6-9 anos">6-9 {isEn ? 'years' : 'anos'}</option>
               <option value="10-13 anos">10-13 {isEn ? 'years' : 'anos'}</option>
