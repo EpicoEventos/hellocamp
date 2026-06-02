@@ -43,7 +43,12 @@ export default function NovoCampo({ params }: { params: Promise<{ lang: string }
   const [pais, setPais] = useState("Portugal");
   const [linguas, setLinguas] = useState({ pt: true, en: false, es: false, fr: false, de: false });
 
-  const [faixasSelecionadas, setFaixasSelecionadas] = useState({ ca6_9: false, ca10_13: false, ca14_17: false, outra: false });
+  const [faixasSelecionadas, setFaixasSelecionadas] = useState({
+    ca6_9: false,
+    ca10_13: false,
+    ca14_17: false,
+    outra: false
+  });
   const [idadeManual, setIdadeManual] = useState("");
 
   const [turnos, setTurnos] = useState([{ nome: "", data_inicio: "", data_fim: "", preco: 0, permite_dias: false, preco_dia: 0, vagas: 20 }]);
@@ -254,35 +259,66 @@ export default function NovoCampo({ params }: { params: Promise<{ lang: string }
 
   return (
     <main style={{ maxWidth: '800px', margin: '0 auto', padding: '2rem', fontFamily: 'sans-serif' }}>
-      <h1 style={{ fontSize: '1.75rem', fontWeight: '900', marginBottom: '2rem' }}>{isEn ? 'Add New Camp' : 'Criar Novo Programa de Férias'}</h1>
+      <h1 style={{ fontSize: '1.75rem', fontWeight: '900', marginBottom: '2rem' }}>
+        {isEn ? 'Add New Camp' : 'Criar Novo Programa de Férias'}
+      </h1>
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
         
+        {/* 1. INFO BÁSICA */}
         <div style={sectionStyle}>
           <h2 style={sectionTitleStyle}>{isEn ? '1. Basic Information' : '1. Informações Básicas'}</h2>
           <div style={gridStyle}>
-            <div><label style={labelStyle}>{isEn ? 'Camp Name' : 'Nome do Campo'}</label><input type="text" required onChange={e => setFormData({...formData, nome: e.target.value})} style={inputStyle} /></div>
+            <div>
+              <label style={labelStyle}>{isEn ? 'Camp Name' : 'Nome do Campo'}</label>
+              <input type="text" required onChange={e => setFormData({...formData, nome: e.target.value})} style={inputStyle} />
+            </div>
             <div>
               <label style={labelStyle}>{isEn ? 'Category' : 'Categoria'}</label>
               <select required onChange={e => setFormData({...formData, categoria: e.target.value})} style={selectStyle}>
                 <option value="">{isEn ? 'Select...' : 'Selecione...'}</option>
-                <option value="Desporto">Desporto</option><option value="Aventura & Natureza">Aventura & Natureza</option><option value="Tecnologia & Ciência">Tecnologia & Ciência</option><option value="Artes & Criatividade">Artes & Criatividade</option><option value="Línguas">Línguas</option>
+                <option value="Desporto">{isEn ? 'Sports' : 'Desporto'}</option>
+                <option value="Aventura & Natureza">{isEn ? 'Adventure & Nature' : 'Aventura & Natureza'}</option>
+                <option value="Tecnologia & Ciência">{isEn ? 'Tech & Science' : 'Tecnologia & Ciência'}</option>
+                <option value="Artes & Criatividade">{isEn ? 'Arts & Creativity' : 'Artes & Criatividade'}</option>
+                <option value="Línguas">{isEn ? 'Languages' : 'Línguas'}</option>
               </select>
             </div>
             
+            {/* GESTÃO DE IDADES FLEXÍVEL */}
             <div style={{ gridColumn: '1 / -1' }}>
-              <label style={labelStyle}>{isEn ? 'Age Groups' : 'Faixas Etárias'}</label>
+              <label style={labelStyle}>{isEn ? 'Age Groups (Select multiple or add manually)' : 'Faixas Etárias (Selecione múltiplas ou adicione manualmente)'}</label>
               <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', marginTop: '0.5rem', marginBottom: '1rem' }}>
-                <label style={checkboxLabelStyle}><input type="checkbox" checked={faixasSelecionadas.ca6_9} onChange={() => handleFaixasChange('ca6_9')} /> 6-9 {isEn ? 'years' : 'anos'}</label>
-                <label style={checkboxLabelStyle}><input type="checkbox" checked={faixasSelecionadas.ca10_13} onChange={() => handleFaixasChange('ca10_13')} /> 10-13 {isEn ? 'years' : 'anos'}</label>
-                <label style={checkboxLabelStyle}><input type="checkbox" checked={faixasSelecionadas.ca14_17} onChange={() => handleFaixasChange('ca14_17')} /> 14-17 {isEn ? 'years' : 'anos'}</label>
-                <label style={checkboxLabelStyle}><input type="checkbox" checked={faixasSelecionadas.outra} onChange={() => handleFaixasChange('outra')} /> {isEn ? 'Custom range' : 'Outro intervalo'}</label>
+                <label style={checkboxLabelStyle}>
+                  <input type="checkbox" checked={faixasSelecionadas.ca6_9} onChange={() => handleFaixasChange('ca6_9')} /> 6-9 {isEn ? 'years' : 'anos'}
+                </label>
+                <label style={checkboxLabelStyle}>
+                  <input type="checkbox" checked={faixasSelecionadas.ca10_13} onChange={() => handleFaixasChange('ca10_13')} /> 10-13 {isEn ? 'years' : 'anos'}
+                </label>
+                <label style={checkboxLabelStyle}>
+                  <input type="checkbox" checked={faixasSelecionadas.ca14_17} onChange={() => handleFaixasChange('ca14_17')} /> 14-17 {isEn ? 'years' : 'anos'}
+                </label>
+                <label style={checkboxLabelStyle}>
+                  <input type="checkbox" checked={faixasSelecionadas.outra} onChange={() => handleFaixasChange('outra')} /> {isEn ? 'Custom range' : 'Outro intervalo'}
+                </label>
               </div>
+              
               {faixasSelecionadas.outra && (
-                <div style={{ maxWidth: '300px' }}><input type="text" required={faixasSelecionadas.outra} value={idadeManual} onChange={e => setIdadeManual(e.target.value)} placeholder="Ex: 8-15 anos" style={inputStyle} /></div>
+                <div style={{ maxWidth: '300px', animation: 'fadeIn 0.2s' }}>
+                  <label style={{ ...labelStyle, fontSize: '11px', color: '#64748b' }}>{isEn ? 'Custom Age Group (e.g.: 8-15 years)' : 'Faixa Etária Customizada (ex: 8-15 anos)'}</label>
+                  <input 
+                    type="text" 
+                    required={faixasSelecionadas.outra} 
+                    value={idadeManual} 
+                    onChange={e => setIdadeManual(e.target.value)} 
+                    placeholder="Ex: 8-15 anos"
+                    style={inputStyle} 
+                  />
+                </div>
               )}
             </div>
 
+            {/* NOVA ADIÇÃO: POLÍTICA DE CANCELAMENTO */}
             <div style={{ gridColumn: '1 / -1', backgroundColor: '#f8fafc', padding: '1.5rem', borderRadius: '1rem', border: '1px solid #e2e8f0' }}>
               <label style={{...labelStyle, color: '#0f172a'}}>{isEn ? 'Cancellation Policy' : 'Política de Cancelamento'}</label>
               <select required value={formData.politica_cancelamento} onChange={e => setFormData({...formData, politica_cancelamento: e.target.value})} style={{...selectStyle, width: '100%'}}>
@@ -305,7 +341,7 @@ export default function NovoCampo({ params }: { params: Promise<{ lang: string }
           </div>
         </div>
 
-        {/* 2. LOCALIZAÇÃO E MAPA */}
+        {/* 2. LOCALIZAÇÃO */}
         <div style={sectionStyle}>
           <h2 style={sectionTitleStyle}>{isEn ? '2. Location' : '2. Localização'}</h2>
           <div style={gridStyle}>
@@ -319,12 +355,13 @@ export default function NovoCampo({ params }: { params: Promise<{ lang: string }
               <div>
                 <label style={labelStyle}>{isEn ? 'District' : 'Distrito'}</label>
                 <select required onChange={e => { setFormData({...formData, Distrito: e.target.value}); setMapPreview(null); }} style={selectStyle}>
-                  <option value="">{isEn ? 'Select District...' : 'Selecione...'}</option>{distritosPT.map(d => <option key={d} value={d}>{d}</option>)}
+                  <option value="">{isEn ? 'Select District...' : 'Selecione o Distrito...'}</option>
+                  {distritosPT.map(d => <option key={d} value={d}>{d}</option>)}
                 </select>
               </div>
             )}
             <div style={{ gridColumn: '1 / -1', position: 'relative' }}>
-              <label style={labelStyle}>{isEn ? 'Specific Address' : 'Morada Específica (Pressione Enter para pesquisar)'}</label>
+              <label style={labelStyle}>{isEn ? 'Specific Address (Press Enter or click outside to search)' : 'Morada Específica (Pressione Enter ou clique fora para pesquisar)'}</label>
               <input type="text" required value={formData.local} onChange={e => { setFormData({...formData, local: e.target.value}); setMapPreview(null); }} onBlur={buscarNoMapaManual} onKeyDown={e => { if(e.key === 'Enter') { e.preventDefault(); buscarNoMapaManual(); } }} style={inputStyle} />
               
               {addressSuggestions.length > 0 && !mapPreview && (
@@ -386,12 +423,196 @@ export default function NovoCampo({ params }: { params: Promise<{ lang: string }
                   <button type="button" onClick={() => handleRemoveTurno(index)} style={{ padding: '0.875rem', backgroundColor: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: '0.5rem', cursor: 'pointer', fontWeight: 'bold' }}>X</button>
                 )}
               </div>
+
+              {/* GESTÃO DE DIAS ISOLADOS */}
+              <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: '1rem', display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+                <label style={checkboxLabelStyle}>
+                  <input type="checkbox" checked={turno.permite_dias} onChange={e => handleTurnoChange(index, 'permite_dias', e.target.checked)} />
+                  {isEn ? 'Allow booking specific days?' : 'Permitir inscrição em dias isolados?'}
+                </label>
+                {turno.permite_dias && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <label style={{ fontSize: '12px', fontWeight: 'bold' }}>{isEn ? 'Price per Day (€):' : 'Preço por Dia (€):'}</label>
+                    <input type="number" required={turno.permite_dias} value={turno.preco_dia} onChange={e => handleTurnoChange(index, 'preco_dia', Number(e.target.value))} style={{ ...inputStyle, width: '100px', padding: '0.5rem' }} />
+                  </div>
+                )}
+              </div>
             </div>
           ))}
         </div>
 
-        {/* 4. CONDIÇÕES E DOCUMENTOS E GALERIA OMITIDOS PARA BREVIDADE (use o código original destas partes) */}
-        
+        {/* 4. CONDIÇÕES E DOCUMENTOS */}
+        <div style={sectionStyle}>
+          <h2 style={sectionTitleStyle}>{isEn ? '4. Program & Conditions' : '4. Programa e Condições'}</h2>
+          <div style={gridStyle}>
+            <div>
+              <label style={labelStyle}>{isEn ? 'Food' : 'Alimentação'}</label>
+              <select value={formData.alimentacao} onChange={e => setFormData({...formData, alimentacao: e.target.value})} style={selectStyle}>
+                <option value="Incluído no Preço">{isEn ? 'Included' : 'Incluído no Preço'}</option>
+                <option value="Opcional (Pago à parte)">{isEn ? 'Optional (Paid extra)' : 'Opcional (Pago à parte)'}</option>
+                <option value="Não tem">{isEn ? 'Not included' : 'Não tem'}</option>
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>{isEn ? 'Accommodation' : 'Alojamento'}</label>
+              <select value={formData.alojamento} onChange={e => setFormData({...formData, alojamento: e.target.value})} style={selectStyle}>
+                <option value="Incluído no Preço">{isEn ? 'Included' : 'Incluído no Preço'}</option>
+                <option value="Opcional (Pago à parte)">{isEn ? 'Optional (Paid extra)' : 'Opcional (Pago à parte)'}</option>
+                <option value="Não tem">{isEn ? 'Not included' : 'Não tem'}</option>
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>{isEn ? 'Insurance' : 'Seguro Obrigatório'}</label>
+              <select value={formData.seguro} onChange={e => setFormData({...formData, seguro: e.target.value})} style={selectStyle}>
+                <option value="Incluído no Preço">{isEn ? 'Included' : 'Incluído no Preço'}</option>
+                <option value="Pago à parte no local">{isEn ? 'Paid locally' : 'Pago à parte no local'}</option>
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>{isEn ? 'Staff Ratio' : 'Rácio Monitores (ex: 1 p/ 5)'}</label>
+              <input type="text" value={formData.racio_monitores} onChange={e => setFormData({...formData, racio_monitores: e.target.value})} style={inputStyle} />
+            </div>
+            
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={labelStyle}>{isEn ? 'Full Description' : 'Descrição Completa do Programa'}</label>
+              <textarea rows={5} required onChange={e => setFormData({...formData, descricao: e.target.value})} style={{...inputStyle, resize: 'vertical'}} />
+            </div>
+
+            <div style={{ gridColumn: '1 / -1', marginTop: '0.5rem' }}>
+              <label style={labelStyle}>{isEn ? 'Specific Rules & Terms' : 'Regras e Termos Específicos'}</label>
+              <textarea rows={4} onChange={e => setFormData({...formData, regras_termos: e.target.value})} placeholder={isEn ? "E.g.: Cancellation policies, what to bring..." : "Ex: Regras da casa, objetos proibidos, vestuário recomendado..."} style={{...inputStyle, resize: 'vertical'}} />
+            </div>
+
+            <div style={{ gridColumn: '1 / -1', marginTop: '0.5rem', padding: '1.5rem', backgroundColor: '#f8fafc', borderRadius: '0.75rem', border: '1px dashed #cbd5e1' }}>
+              <label style={labelStyle}>{isEn ? 'Camp Program (PDF/Word)' : 'Programa do Campo (PDF/Word)'}</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'flex-start' }}>
+                {documentos.length > 0 && (
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', width: '100%' }}>
+                    {documentos.map((doc, idx) => (
+                      <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'white', padding: '0.5rem 1rem', borderRadius: '0.5rem', border: '1px solid #e2e8f0', fontSize: '13px', gap: '1rem' }}>
+                        <span style={{ fontWeight: 'bold', color: '#0f172a' }}>📄 {doc.name}</span>
+                        <button type="button" onClick={() => removeDoc(idx)} style={{ color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>X</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <label style={{ display: 'inline-block', padding: '0.75rem 1.5rem', backgroundColor: '#e2e8f0', color: '#334155', fontWeight: 'bold', borderRadius: '0.5rem', cursor: 'pointer', textAlign: 'center', fontSize: '14px' }}>
+                  + {isEn ? 'Attach Document' : 'Anexar Documento'}
+                  <input type="file" accept=".pdf,.doc,.docx" multiple onChange={handleDocSelect} style={{ display: 'none' }} />
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 5. CUSTOS EXTRA OPCIONAIS */}
+        <div style={sectionStyle}>
+          <div style={{ marginBottom: '1.5rem', borderBottom: '2px solid #f1f5f9', paddingBottom: '1rem' }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: '800', color: '#0f172a', margin: 0 }}>{isEn ? '5. Optional Services (€)' : '5. Custos de Serviços Opcionais (€)'}</h2>
+            <p style={{ fontSize: '13px', color: '#64748b', marginTop: '0.5rem' }}>{isEn ? 'Fill in only if marked as "Optional" above.' : 'Preencha apenas se escolheu como "Opcional" acima.'}</p>
+          </div>
+          
+          <div style={gridStyle}>
+            <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '0.75rem', border: '1px solid #e2e8f0' }}>
+              <label style={labelStyle}>{isEn ? 'Extra Food' : 'Alimentação Extra'}</label>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <input type="number" onChange={e => setFormData({...formData, extra_alimentacao: Number(e.target.value)})} style={{...inputStyle, flex: 1}} />
+                <select value={formData.tipo_cobranca_alimentacao} onChange={e => setFormData({...formData, tipo_cobranca_alimentacao: e.target.value})} style={{...selectStyle, flex: 1}}>
+                  <option value="Por Turno">{isEn ? 'Per Shift' : 'Por Turno'}</option>
+                  <option value="Por Dia">{isEn ? 'Per Day' : 'Por Dia'}</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '0.75rem', border: '1px solid #e2e8f0' }}>
+              <label style={labelStyle}>{isEn ? 'Extra Accom.' : 'Alojamento Extra'}</label>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <input type="number" onChange={e => setFormData({...formData, extra_alojamento: Number(e.target.value)})} style={{...inputStyle, flex: 1}} />
+                <select value={formData.tipo_cobranca_alojamento} onChange={e => setFormData({...formData, tipo_cobranca_alojamento: e.target.value})} style={{...selectStyle, flex: 1}}>
+                  <option value="Por Turno">{isEn ? 'Per Shift' : 'Por Turno'}</option>
+                  <option value="Por Dia">{isEn ? 'Per Day' : 'Por Dia'}</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '0.75rem', border: '1px solid #e2e8f0' }}>
+              <label style={labelStyle}>{isEn ? 'Extended Hours' : 'Prolongamento'}</label>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <input type="number" onChange={e => setFormData({...formData, extra_prolongamento: Number(e.target.value)})} style={{...inputStyle, flex: 1}} />
+                <select value={formData.tipo_cobranca_prolongamento} onChange={e => setFormData({...formData, tipo_cobranca_prolongamento: e.target.value})} style={{...selectStyle, flex: 1}}>
+                  <option value="Por Turno">{isEn ? 'Per Shift' : 'Por Turno'}</option>
+                  <option value="Por Dia">{isEn ? 'Per Day' : 'Por Dia'}</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '0.75rem', border: '1px solid #e2e8f0' }}>
+              <label style={labelStyle}>{isEn ? 'Transport' : 'Transporte Opcional'}</label>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <input type="number" onChange={e => setFormData({...formData, extra_transporte: Number(e.target.value)})} style={{...inputStyle, flex: 1}} />
+                <select value={formData.tipo_cobranca_transporte} onChange={e => setFormData({...formData, tipo_cobranca_transporte: e.target.value})} style={{...selectStyle, flex: 1}}>
+                  <option value="Por Turno">{isEn ? 'Per Shift' : 'Por Turno'}</option>
+                  <option value="Por Dia">{isEn ? 'Per Day' : 'Por Dia'}</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 6. GALERIA */}
+        <div style={sectionStyle}>
+          <div style={{ marginBottom: '1.5rem', borderBottom: '2px solid #f1f5f9', paddingBottom: '1rem' }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: '800', color: '#0f172a', margin: 0 }}>{isEn ? '6. Main Photo & Gallery' : '6. Fotografia Principal e Galeria'}</h2>
+          </div>
+          
+          <div style={{ marginBottom: '1.5rem' }}>
+            <p style={{ fontSize: '13px', fontWeight: 'bold', color: '#334155', marginBottom: '0.75rem', textTransform: 'uppercase' }}>
+              {isEn ? 'Option A: Choose a Platform Template' : 'Opção A: Escolher Fotografia Padrão da Plataforma'}
+            </p>
+            <div style={{ display: 'flex', gap: '1rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
+              {FOTOS_PADRAO.map((foto, idx) => (
+                <div key={idx} onClick={() => selecionarFotoPadrao(foto.url)} style={{ minWidth: '120px', height: '80px', borderRadius: '0.5rem', overflow: 'hidden', border: images[0]?.url === foto.url ? '3px solid #059669' : '1px solid #cbd5e1', cursor: 'pointer', position: 'relative' }}>
+                  <img src={foto.url} alt={foto.nome} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  {images[0]?.url === foto.url && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(5, 150, 105, 0.2)' }} />}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ textAlign: 'center', color: '#94a3b8', fontWeight: 'bold', margin: '1.5rem 0', fontSize: '12px' }}>{isEn ? 'OR' : 'OU'}</div>
+
+          <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100px', cursor: 'pointer', backgroundColor: '#f8fafc', border: '2px dashed #cbd5e1', borderRadius: '0.75rem', transition: 'background-color 0.2s' }}>
+            <span style={{ fontWeight: 'bold', color: '#64748b', fontSize: '15px' }}>
+              {isEn ? '📸 Click here to upload your own photos...' : '📸 Clique aqui para enviar as suas próprias fotografias...'}
+            </span>
+            <input type="file" accept="image/*" multiple onChange={handleFileSelect} style={{ display: 'none' }} />
+          </label>
+
+          {images.length > 0 && !usarFotoPadrao && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '1rem', marginTop: '1.5rem' }}>
+              {images.map((img, idx) => (
+                <div key={idx} style={{ position: 'relative', borderRadius: '0.75rem', overflow: 'hidden', border: img.isMain ? '3px solid #059669' : '1px solid #e2e8f0', height: '120px' }}>
+                  <img src={img.preview} alt={`Preview ${idx}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <button type="button" onClick={() => removeImage(idx)} style={{ position: 'absolute', top: '5px', right: '5px', background: '#dc2626', color: 'white', borderRadius: '50%', width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>X</button>
+                  {!img.isMain && (
+                    <button type="button" onClick={() => setMainImage(idx)} style={{ position: 'absolute', bottom: '5px', left: '5px', right: '5px', background: 'rgba(15,23,42,0.85)', color: 'white', fontSize: '11px', padding: '6px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>
+                      {isEn ? 'Set as Main' : 'Tornar Principal'}
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* AVISO DE CONTRATO / REVISÃO */}
+        <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', padding: '1rem', borderRadius: '0.75rem', marginBottom: '1rem' }}>
+          <p style={{ margin: 0, fontSize: '13px', color: '#b45309', fontWeight: 'bold' }}>
+            ⚠️ {isEn ? 'Important: After saving, your camp will be "Pending". It will only be visible to the public after HelloCamp validates the program and attaches the signed contract.' : 'Importante: Após gravar, o seu campo ficará em análise. Só ficará visível ao público após a validação do programa e a inserção do contrato assinado pela equipa HelloCamp.'}
+          </p>
+        </div>
+
+        {/* SUBMIT */}
         <button type="submit" disabled={loading} style={{ padding: '1.25rem', backgroundColor: '#0f172a', color: 'white', fontWeight: '900', borderRadius: '0.75rem', border: 'none', cursor: loading ? 'not-allowed' : 'pointer', fontSize: '1.125rem', transition: 'transform 0.1s' }}>
           {loading ? statusText : (isEn ? 'Save & Submit for Review' : 'Gravar e Submeter para Validação')}
         </button>
@@ -400,6 +621,7 @@ export default function NovoCampo({ params }: { params: Promise<{ lang: string }
   );
 }
 
+// ESTILOS EM LINHA MANUTENÇÃO ORIGINAL
 const sectionStyle = { backgroundColor: 'white', padding: '2.5rem', borderRadius: '1rem', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' };
 const sectionTitleStyle = { fontSize: '1.25rem', fontWeight: '800', color: '#0f172a', borderBottom: '2px solid #f1f5f9', paddingBottom: '1rem', marginBottom: '2rem' };
 const gridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem' };

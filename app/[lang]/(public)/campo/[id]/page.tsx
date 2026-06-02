@@ -50,7 +50,7 @@ export default async function DetalhesDoCampo({ params }: { params: Promise<{ la
     parceiroInfo = organizador;
   }
 
-  // GATILHO DE PROVA SOCIAL (Aleatório inteligente: baseado no tamanho do campo para ser realista)
+  // Gatilho de Prova Social Dinâmico
   const viewsHoje = Math.floor(Math.random() * (campo.vagas_totais > 50 ? 25 : 8)) + 2; 
 
   const nomeCampo = isEn && campo.nome_en ? campo.nome_en : campo.nome;
@@ -127,14 +127,16 @@ export default async function DetalhesDoCampo({ params }: { params: Promise<{ la
 
   return (
     <main className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-24">
-      {/* SCRIPTS INVISÍVEIS PARA SEO (Poder Máximo) */}
+      {/* SCRIPTS INVISÍVEIS PARA SEO */}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(eventSchema) }} />
 
+      {/* HERO SECTION */}
       <div className="relative w-full h-[580px] bg-slate-900 overflow-hidden">
         <img src={campo.imagem} alt={nomeCampo} className="w-full h-full object-cover opacity-90" />
         <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-transparent"></div>
 
+        {/* BREADCRUMBS VISUAIS */}
         <div className="absolute top-6 left-6 z-30 hidden sm:block">
           <nav className="flex items-center gap-2 text-[10px] sm:text-xs font-bold text-slate-700 bg-white/95 backdrop-blur-sm px-5 py-2.5 rounded-full shadow-md border border-white/20 tracking-wider uppercase">
             <Link href={`/${lang}`} className="hover:text-emerald-600 transition-colors">{isEn ? 'Home' : 'Início'}</Link>
@@ -146,6 +148,12 @@ export default async function DetalhesDoCampo({ params }: { params: Promise<{ la
             <span className="text-slate-400 max-w-[120px] sm:max-w-[200px] truncate" title={nomeCampo}>{nomeCampo}</span>
           </nav>
         </div>
+
+        <div className="absolute top-6 left-4 z-30 sm:hidden">
+           <Link href={`/${lang}/distrito/${encodeURIComponent(campo.Distrito || localCampo)}`} className="inline-flex items-center gap-2 rounded-full bg-white/95 backdrop-blur-sm px-4 py-2.5 text-xs font-bold text-slate-700 shadow-md border border-white/20 uppercase tracking-wider">
+            &larr; {localCampo}
+          </Link>
+        </div>
       </div>
 
       <div className="max-w-[1100px] mx-auto pt-10 pb-10 px-4 md:px-6">
@@ -153,6 +161,7 @@ export default async function DetalhesDoCampo({ params }: { params: Promise<{ la
           
           <div className="flex-1 w-full flex flex-col gap-6">
             
+            {/* CABEÇALHO DO CAMPO (z-40 para isolamento de contexto do modal) */}
             <div className="bg-white p-8 md:p-10 rounded-3xl shadow-sm border border-slate-100 relative z-40">
               <div className="absolute top-8 right-8 z-50 flex items-center gap-3">
                 <BotaoPartilha url={campoUrlCompleto} titulo={nomeCampo} isEn={isEn} />
@@ -166,23 +175,23 @@ export default async function DetalhesDoCampo({ params }: { params: Promise<{ la
               
               <h1 className="text-4xl md:text-5xl font-black text-slate-900 leading-tight mb-4">{nomeCampo}</h1>
               
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-4 flex-wrap">
                 <div className="flex items-center gap-2">
                   <span className="text-[#EBA914] text-lg font-black">★ {scoreAvaliacoes > 0 ? scoreAvaliacoes.toFixed(1) : 'Novo'}</span>
                   <span className="text-slate-400 text-sm font-bold underline decoration-slate-300 underline-offset-4">
                     ({totalAvaliacoes} {isEn ? 'reviews' : 'avaliações'})
                   </span>
                 </div>
-                {/* POPUP DE PROVA SOCIAL VISUAL */}
                 <div className="bg-rose-50 border border-rose-100 text-rose-600 text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 animate-pulse">
                   🔥 {viewsHoje} {isEn ? 'parents viewing right now' : 'pais a ver agora'}
                 </div>
               </div>
             </div>
 
+            {/* DESCRIÇÃO E PERFIL DO ORGANIZADOR */}
             <div className="bg-white p-8 md:p-10 rounded-3xl shadow-sm border border-slate-100 relative z-10">
               <h2 className="text-xl font-bold text-slate-900 mb-4 border-b border-slate-50 pb-3">{dict.detalhe.sobre_programa}</h2>
-              <p className="leading-relaxed text-slate-600 text-base whitespace-pre-wrap font-medium">{descCampo}</p>
+              <p className="leading-relaxed text-slate-600 text-base whitespace-pre-wrap font-medium mb-0">{descCampo}</p>
               
               {campo.organizador_id && parceiroInfo && (
                 <Link href={`/${lang}/admin/${campo.organizador_id}`} className="mt-8 flex items-center justify-between p-4 bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 transition-colors no-underline group">
@@ -211,6 +220,7 @@ export default async function DetalhesDoCampo({ params }: { params: Promise<{ la
               )}
             </div>
 
+            {/* DATAS E DISPONIBILIDADE */}
             <div className="bg-white p-8 md:p-10 rounded-3xl shadow-sm border border-slate-100 relative z-10">
               <h2 className="text-xl font-bold text-slate-900 mb-5">{dict.detalhe.datas_disponibilidade}</h2>
               <div className="bg-emerald-50/50 rounded-2xl p-5 border border-emerald-100">
@@ -246,13 +256,15 @@ export default async function DetalhesDoCampo({ params }: { params: Promise<{ la
               </div>
             </div>
 
+            {/* REGRAS E TERMOS ESPECÍFICOS */}
             {regrasCampo && (
               <div className="bg-white p-8 md:p-10 rounded-3xl shadow-sm border border-slate-100 relative z-10">
                 <h2 className="text-xl font-bold text-slate-900 mb-4 border-b border-slate-50 pb-3">{isEn ? 'Specific Rules & Terms' : 'Regras e Termos'}</h2>
-                <p className="leading-relaxed text-slate-500 text-sm whitespace-pre-wrap font-medium">{regrasCampo}</p>
+                <p className="leading-relaxed text-slate-500 text-sm whitespace-pre-wrap font-medium mb-0">{regrasCampo}</p>
               </div>
             )}
 
+            {/* INFORMAÇÕES LOGÍSTICAS IMPORTANTES */}
             <div className="bg-white p-8 md:p-10 rounded-3xl shadow-sm border border-slate-100 relative z-10">
               <h2 className="text-xl font-bold text-slate-900 mb-6">{dict.detalhe.informacoes_importantes}</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -275,7 +287,7 @@ export default async function DetalhesDoCampo({ params }: { params: Promise<{ la
               </div>
             </div>
 
-            {/* ZONA DE AVALIAÇÕES */}
+            {/* SECÇÃO DE AVALIAÇÕES */}
             <div className="bg-white p-8 md:p-10 rounded-3xl shadow-sm border border-slate-100 relative z-10">
               <div className="flex items-center justify-between mb-8 border-b border-slate-50 pb-4">
                 <h2 className="text-xl font-bold text-slate-900 m-0">{isEn ? 'Reviews' : 'Avaliações'}</h2>
@@ -308,11 +320,56 @@ export default async function DetalhesDoCampo({ params }: { params: Promise<{ la
                 </div>
               )}
             </div>
-            
-            {/* FORMULÁRIO DE CONTACTO OMITIDO PARA MANTER A BREVIDADE, MAS DEVE FICAR AQUI IGUAl */}
 
+            {/* FORMULÁRIO DE CONTACTO COMPLETO */}
+            <div className="bg-white p-8 md:p-10 rounded-3xl shadow-sm border border-slate-100 relative z-10">
+              <h3 className="text-xl font-bold text-slate-900 mb-2">{dict.detalhe.duvidas_titulo}</h3>
+              <p className="text-sm text-slate-500 font-medium mb-8">{dict.detalhe.duvidas_sub}</p>
+              
+              <form action="https://formsubmit.co/info@hellocamp.com" method="POST" className="flex flex-col gap-6">
+                <input type="hidden" name="_captcha" value="false" />
+                <input type="hidden" name="_subject" value={`${isEn ? 'Question regarding HelloCamp:' : 'Dúvida sobre o campo HelloCamp:'} ${nomeCampo}`} />
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">{dict.detalhe.nome}</label>
+                    <input type="text" name={isEn ? 'First_Name' : 'Nome'} required className="p-3.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-900 outline-none focus:border-slate-400" />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">{dict.detalhe.apelido}</label>
+                    <input type="text" name={isEn ? 'Last_Name' : 'Apelido'} required className="p-3.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-900 outline-none focus:border-slate-400" />
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">{dict.detalhe.email_encarregado}</label>
+                    <input type="email" name="Email" required className="p-3.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-900 outline-none focus:border-slate-400" />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">{dict.detalhe.contacto_telefonico}</label>
+                    <input type="tel" name={isEn ? 'Phone' : 'Telefone'} required className="p-3.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-900 outline-none focus:border-slate-400" />
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">{dict.detalhe.idade_participante}</label>
+                  <input type="number" name={isEn ? 'Age' : 'Idade'} min="1" required className="p-3.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-900 outline-none focus:border-slate-400" />
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">{dict.detalhe.mensagem}</label>
+                  <textarea name={isEn ? 'Message' : 'Mensagem'} rows={4} required className="p-3.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-900 outline-none focus:border-slate-400 resize-none"></textarea>
+                </div>
+                
+                <button type="submit" className="self-start px-8 py-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm transition-colors shadow-sm">
+                  {dict.detalhe.enviar_mensagem}
+                </button>
+              </form>
+            </div>
           </div>
 
+          {/* SIDEBAR COM CAIXA DE RESERVA */}
           <div className="w-full lg:w-[400px] flex-shrink-0 lg:sticky lg:top-8 relative z-30">
             <CaixaReserva campo={campo} lang={lang} dict={dict} />
           </div>
