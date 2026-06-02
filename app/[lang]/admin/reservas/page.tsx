@@ -12,7 +12,6 @@ export default function GestaoReservasParceiro({ params }: { params: Promise<{ l
   const [campoGrupos, setCampoGrupos] = useState<any[]>([]);
   const [filtroCampoId, setFiltroCampoId] = useState<string>('todos');
   
-  // Estado para a Ficha Detalhada (Modal)
   const [reservaSelecionada, setReservaSelecionada] = useState<any>(null);
 
   useEffect(() => {
@@ -20,7 +19,6 @@ export default function GestaoReservasParceiro({ params }: { params: Promise<{ l
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      // Busca os campos E as reservas, E as crianças, E os pais... tudo numa query!
       const { data: camposData, error } = await supabase
         .from('campos')
         .select(`
@@ -38,7 +36,9 @@ export default function GestaoReservasParceiro({ params }: { params: Promise<{ l
             extras_escolhidos,
             status_pagamento,
             criancas (
-              nome, nif, data_nascimento, sexo, restricoes_alimentares
+              nome, nif, data_nascimento, sexo, restricoes_alimentares,
+              tipo_sanguineo, doencas_cronicas, medicacao_regular, limitacoes_fisicas,
+              sabe_nadar, sabe_andar_bicicleta, tamanho_tshirt
             ),
             perfis (
               nome_completo, email, telefone, nif, contacto_emergencia, pessoas_autorizadas_recolha
@@ -118,7 +118,6 @@ export default function GestaoReservasParceiro({ params }: { params: Promise<{ l
   let campoNomeFicheiro = "geral";
   let vagasTotaisExibidas = 0;
   let inscritosRows: any[] = [];
-  let contextoContratoOculto = false;
 
   if (filtroCampoId === 'todos') {
     campoGrupos.forEach(g => {
@@ -131,7 +130,6 @@ export default function GestaoReservasParceiro({ params }: { params: Promise<{ l
       vagasTotaisExibidas = grupoSelecao.vagas_totais;
       campoNomeFicheiro = grupoSelecao.nome.toLowerCase().replace(/\s+/g, '_');
       inscritosRows = [...grupoSelecao.inscritos];
-      if (!grupoSelecao.contratoUrl) contextoContratoOculto = true;
     }
   }
 
@@ -142,7 +140,7 @@ export default function GestaoReservasParceiro({ params }: { params: Promise<{ l
   inscritosRows.forEach((item: any) => {
     if (item.crianca?.sexo === 'Masculino') masc++;
     if (item.crianca?.sexo === 'Feminino') fem++;
-    if (temAlertaMedico(item.crianca?.restricoes_alimentares)) comAlergia++;
+    if (temAlertaMedico(item.crianca?.restricoes_alimentares) || temAlertaMedico(item.crianca?.doencas_cronicas)) comAlergia++;
     if (item.crianca?.data_nascimento) somaIdades += obterIdade(item.crianca.data_nascimento);
   });
 
@@ -157,14 +155,17 @@ export default function GestaoReservasParceiro({ params }: { params: Promise<{ l
       return;
     }
 
-    let conteudoCsv = "Campo;Turno;Nome Crianca;Idade;Sexo;NIF;Alergias/Restricoes;Encarregado;Telefone;Valor;Estado Pagamento;Data/Hora Inscricao\n";
+    let conteudoCsv = "Campo;Turno;Nome Crianca;Idade;Sexo;Sabe Nadar;Bicicleta;T-Shirt;Alergias/Restricoes;Doencas;Medicacao;Encarregado;Telefone;Emergencia;Valor;Estado Pagamento\n";
     inscritosRows.forEach((item: any) => {
-      const cAlergias = temAlertaMedico(item.crianca?.restricoes_alimentares) ? item.crianca.restricoes_alimentares.replace(/;/g, ",") : "Nenhuma";
-      const cData = new Date(item.dataReserva).toLocaleString('pt-PT');
-      const paiNome = item.pai?.nome_completo || "N/A";
-      const paiTel = item.pai?.telefone || "N/A";
+      const c = item.crianca || {};
+      const p = item.pai || {};
+      
+      const cAlergias = temAlertaMedico(c.restricoes_alimentares) ? c.restricoes_alimentares.replace(/;/g, ",") : "Nenhuma";
+      const cDoencas = c.doencas_cronicas ? c.doencas_cronicas.replace(/;/g, ",") : "N/A";
+      const cMeds = c.medicacao_regular ? c.medicacao_regular.replace(/;/g, ",") : "N/A";
+      const emerg = p.contacto_emergencia ? p.contacto_emergencia.replace(/;/g, ",") : "N/A";
 
-      conteudoCsv += `${item.campNome};${item.turno};${item.crianca?.nome || ""};${item.crianca?.data_nascimento ? obterIdade(item.crianca.data_nascimento) : ""};${item.crianca?.sexo || ""};${item.crianca?.nif || ""};${cAlergias};${paiNome};${paiTel};${item.valor}€;${item.statusPagamento};${cData}\n`;
+      conteudoCsv += `${item.campNome};${item.turno};${c.nome || ""};${c.data_nascimento ? obterIdade(c.data_nascimento) : ""};${c.sexo || ""};${c.sabe_nadar || ""};${c.sabe_andar_bicicleta || ""};${c.tamanho_tshirt || ""};${cAlergias};${cDoencas};${cMeds};${p.nome_completo || "N/A"};${p.telefone || "N/A"};${emerg};${item.valor}€;${item.statusPagamento}\n`;
     });
 
     const blob = new Blob(["\ufeff" + conteudoCsv], { type: "text/csv;charset=utf-8;" });
@@ -195,171 +196,106 @@ export default function GestaoReservasParceiro({ params }: { params: Promise<{ l
           <label style={{ display: 'block', fontSize: '11px', fontWeight: '800', color: '#334155', textTransform: 'uppercase', marginBottom: '0.5rem', letterSpacing: '0.05em' }}>
             {isEn ? 'Select Program Context' : 'Selecionar Campo de Férias'}
           </label>
-          <select 
-            value={filtroCampoId} 
-            onChange={(e) => setFiltroCampoId(e.target.value)} 
-            style={selectDropdownStyle}
-          >
+          <select value={filtroCampoId} onChange={(e) => setFiltroCampoId(e.target.value)} style={selectDropdownStyle}>
             <option value="todos">{isEn ? 'All Active Camps (Global)' : 'Visão Global (Todos os Campos)'}</option>
             {campoGrupos.map(c => (
-              <option key={c.id} value={c.id}>
-                {c.nome} {!c.contratoUrl && '(Oculto)'}
-              </option>
+              <option key={c.id} value={c.id}>{c.nome}</option>
             ))}
           </select>
         </div>
       </div>
 
-      {campoGrupos.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '5rem', border: '2px dashed #cbd5e1', borderRadius: '1.5rem', backgroundColor: 'white', color: '#64748b' }}>
-          {isEn ? 'You have no active camps.' : 'Ainda não tem nenhum programa de férias registado.'}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem' }}>
+          <div style={statCardStyle}>
+            <span style={statLabelStyle}>{isEn ? 'TOTAL CAPACITY' : 'VAGAS TOTAIS CONTEXTO'}</span>
+            <span style={{ fontSize: '2rem', fontWeight: '900', color: '#0f172a' }}>{vagasTotaisExibidas}</span>
+          </div>
+          <div style={{ ...statCardStyle, borderLeft: '4px solid #059669' }}>
+            <span style={statLabelStyle}>{isEn ? 'TOTAL ENROLLED' : 'TOTAL INSCRITOS'}</span>
+            <span style={{ fontSize: '2rem', fontWeight: '900', color: '#059669' }}>{inscritosCount}</span>
+          </div>
+          <div style={{ ...statCardStyle, backgroundColor: '#f8fafc', justifyContent: 'center', alignItems: 'center' }}>
+            <button onClick={exportarParaExcel} disabled={inscritosCount === 0} style={{ backgroundColor: inscritosCount === 0 ? '#cbd5e1' : '#0f172a', color: 'white', border: 'none', padding: '0.75rem 1rem', borderRadius: '0.5rem', fontWeight: 'bold', cursor: inscritosCount === 0 ? 'not-allowed' : 'pointer', fontSize: '13px', width: '100%', textAlign: 'center' }}>
+              📥 {isEn ? 'Export CSV' : 'Exportar Ficha Excel'}
+            </button>
+          </div>
         </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
 
-          {/* AVISO DO ESTADO DO CONTRATO NA VISTA DO CAMPO */}
-          {contextoContratoOculto && (
-            <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', padding: '1rem', borderRadius: '0.75rem' }}>
-              <p style={{ margin: 0, fontSize: '13px', color: '#dc2626', fontWeight: 'bold' }}>
-                🔴 {isEn ? 'This camp is hidden from the public. Waiting for HelloCamp contract.' : 'Atenção: Este campo está invisível para o público pois aguarda a validação e o contrato da HelloCamp.'}
-              </p>
-            </div>
-          )}
+        <div style={{ backgroundColor: 'white', borderRadius: '1.25rem', border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
+          <div style={{ padding: '1.25rem 1.5rem', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '800', color: '#334155', textTransform: 'uppercase' }}>{isEn ? 'NOMINAL ROSTER' : 'LISTA NOMINAL DE PARTICIPANTES'}</h3>
+          </div>
           
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem' }}>
-            <div style={statCardStyle}>
-              <span style={statLabelStyle}>{isEn ? 'TOTAL CAPACITY' : 'VAGAS TOTAIS CONTEXTO'}</span>
-              <span style={{ fontSize: '2rem', fontWeight: '900', color: '#0f172a' }}>{vagasTotaisExibidas}</span>
-            </div>
-            <div style={{ ...statCardStyle, borderLeft: '4px solid #059669' }}>
-              <span style={statLabelStyle}>{isEn ? 'TOTAL ENROLLED' : 'TOTAL INSCRITOS'}</span>
-              <span style={{ fontSize: '2rem', fontWeight: '900', color: '#059669' }}>{inscritosCount}</span>
-            </div>
-            <div style={{ ...statCardStyle, borderLeft: '4px solid #de5d25' }}>
-              <span style={statLabelStyle}>{isEn ? 'VACANT SPOTS' : 'VAGAS LIVRES RESTRITAS'}</span>
-              <span style={{ fontSize: '2rem', fontWeight: '900', color: '#de5d25' }}>{disponiveisCount}</span>
-            </div>
-            <div style={{ ...statCardStyle, backgroundColor: '#f8fafc', justifyContent: 'center', alignItems: 'center' }}>
-              <button 
-                onClick={exportarParaExcel}
-                disabled={inscritosCount === 0}
-                style={{ backgroundColor: inscritosCount === 0 ? '#cbd5e1' : '#0f172a', color: 'white', border: 'none', padding: '0.75rem 1rem', borderRadius: '0.5rem', fontWeight: 'bold', cursor: inscritosCount === 0 ? 'not-allowed' : 'pointer', fontSize: '13px', width: '100%', textAlign: 'center' }}
-              >
-                📥 {isEn ? 'Export CSV' : 'Exportar Contexto (Excel)'}
-              </button>
-            </div>
-          </div>
-
-          <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '1.25rem', border: '1px solid #e2e8f0', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '2rem' }}>
-            <div>
-              <span style={analyticsLabelStyle}>{isEn ? 'GENDER RATIO' : 'DISTRIBUIÇÃO POR SEXO'}</span>
-              <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#334155', marginTop: '0.5rem' }}>
-                🙋‍♂️ {pctMasc}% Masc. &nbsp;|&nbsp; 🙋‍♀️ {pctFem}% Fem.
+          <div style={{ overflowX: 'auto' }}>
+            {inscritosCount === 0 ? (
+              <div style={{ padding: '4rem', textAlign: 'center', color: '#94a3b8', fontSize: '14px', fontWeight: 'bold' }}>
+                Não existem inscrições processadas para a seleção atual.
               </div>
-            </div>
-            <div>
-              <span style={analyticsLabelStyle}>{isEn ? 'MEDICAL RATE' : 'TAXA DE ALERTAS REAIS'}</span>
-              <div style={{ fontSize: '14px', fontWeight: 'bold', color: comAlergia > 0 ? '#b91c1c' : '#047857', marginTop: '0.5rem' }}>
-                ⚠️ {pctAlergias}% com Restrições Médicas ({comAlergia} miúdos)
-              </div>
-            </div>
-            <div>
-              <span style={analyticsLabelStyle}>{isEn ? 'AVERAGE AGE' : 'MÉDIA DE IDADES'}</span>
-              <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#0f172a', marginTop: '0.5rem' }}>
-                📅 {mediaIdades} anos de média
-              </div>
-            </div>
-          </div>
-
-          <div style={{ backgroundColor: 'white', borderRadius: '1.25rem', border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
-            <div style={{ padding: '1.25rem 1.5rem', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '800', color: '#334155', textTransform: 'uppercase' }}>{isEn ? 'NOMINAL ROSTER' : 'LISTA NOMINAL DE PARTICIPANTES FILTRADA'}</h3>
-              <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 'bold' }}>{inscritosCount} Registos Detetados</span>
-            </div>
-            
-            <div style={{ overflowX: 'auto' }}>
-              {inscritosCount === 0 ? (
-                <div style={{ padding: '4rem', textAlign: 'center', color: '#94a3b8', fontSize: '14px', fontWeight: 'bold' }}>
-                  Não existem inscrições processadas para a seleção atual.
-                </div>
-              ) : (
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
-                  <thead>
-                    <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fdfdfd' }}>
-                      <th style={thStyle}>{isEn ? 'PARTICIPANT' : 'MIÚDO / PROGRAMA'}</th>
-                      <th style={thStyle}>{isEn ? 'AGE' : 'IDADE'}</th>
-                      <th style={thStyle}>{isEn ? 'HEALTH/DIET' : 'RESTRIÇÕES DE SAÚDE'}</th>
-                      <th style={thStyle}>{isEn ? 'SHIFT' : 'TURNO'}</th>
-                      <th style={thStyle}>{isEn ? 'GUARDIAN' : 'ENCARREGADO'}</th>
-                      <th style={thStyle}>{isEn ? 'PAYMENT' : 'ESTADO'}</th>
-                      <th style={thStyle}>{isEn ? 'ACTIONS' : 'AÇÕES'}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {inscritosRows.map((item: any, idx: number) => {
-                      const alertaVerdadeiro = temAlertaMedico(item.crianca?.restricoes_alimentares);
-                      
-                      return (
-                        <tr key={idx} style={{ borderBottom: idx !== inscritosRows.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
-                          <td style={tdStyle}>
-                            <div style={{ fontWeight: 'bold', color: '#0f172a' }}>{item.crianca?.nome || 'N/A'}</div>
-                            <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>🏕️ {item.campNome}</div>
-                          </td>
-                          <td style={tdStyle}>{item.crianca?.data_nascimento ? `${obterIdade(item.crianca.data_nascimento)} anos` : '-'}</td>
-                          <td style={tdStyle}>
-                            {alertaVerdadeiro ? (
-                              <span style={{ backgroundColor: '#fef2f2', color: '#b91c1c', padding: '0.35rem 0.75rem', borderRadius: '0.5rem', fontSize: '12px', fontWeight: 'bold' }}>
-                                ⚠️ {item.crianca.restricoes_alimentares}
-                              </span>
-                            ) : (
-                              <span style={{ color: '#94a3b8' }}>-</span>
-                            )}
-                          </td>
-                          <td style={{ ...tdStyle, fontWeight: '600' }}>
-                            {item.turno} <div style={{ fontSize: '11px', color: '#059669' }}>{item.valor}€</div>
-                          </td>
-                          <td style={tdStyle}>
-                            <div style={{ color: '#334155', fontWeight: '600' }}>{item.pai?.nome_completo || 'Sem Nome'}</div>
-                            <div style={{ fontSize: '11px', color: '#64748b' }}>{item.pai?.telefone || '-'}</div>
-                          </td>
-                          <td style={tdStyle}>
-                            <button 
-                              type="button"
-                              onClick={() => toggleStatusPagamento(item.reservaId, item.statusPagamento)}
-                              style={{
-                                backgroundColor: item.statusPagamento === 'Pago' ? '#ecfdf5' : '#fff7ed',
-                                color: item.statusPagamento === 'Pago' ? '#059669' : '#c2410c',
-                                border: `1px solid ${item.statusPagamento === 'Pago' ? '#a7f3d0' : '#fed7aa'}`,
-                                padding: '0.35rem 0.75rem', borderRadius: '999px', fontSize: '11px', fontWeight: '900', cursor: 'pointer'
-                              }}
-                            >
-                              {item.statusPagamento}
-                            </button>
-                          </td>
-                          <td style={tdStyle}>
-                            <button onClick={() => setReservaSelecionada(item)} style={{ padding: '0.5rem 1rem', backgroundColor: '#f1f5f9', color: '#0f172a', border: '1px solid #cbd5e1', borderRadius: '0.5rem', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px' }}>
-                              {isEn ? 'View Details' : 'Ver Ficha'}
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              )}
-            </div>
+            ) : (
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fdfdfd' }}>
+                    <th style={thStyle}>{isEn ? 'PARTICIPANT' : 'MIÚDO / PROGRAMA'}</th>
+                    <th style={thStyle}>{isEn ? 'AGE' : 'IDADE'}</th>
+                    <th style={thStyle}>{isEn ? 'HEALTH/DIET' : 'SAÚDE'}</th>
+                    <th style={thStyle}>{isEn ? 'SHIFT' : 'TURNO'}</th>
+                    <th style={thStyle}>{isEn ? 'PAYMENT' : 'ESTADO'}</th>
+                    <th style={thStyle}>{isEn ? 'ACTIONS' : 'AÇÕES'}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {inscritosRows.map((item: any, idx: number) => {
+                    const temAlerta = temAlertaMedico(item.crianca?.restricoes_alimentares) || temAlertaMedico(item.crianca?.doencas_cronicas);
+                    
+                    return (
+                      <tr key={idx} style={{ borderBottom: idx !== inscritosRows.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
+                        <td style={tdStyle}>
+                          <div style={{ fontWeight: 'bold', color: '#0f172a' }}>{item.crianca?.nome || 'N/A'}</div>
+                          <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>🏕️ {item.campNome}</div>
+                        </td>
+                        <td style={tdStyle}>{item.crianca?.data_nascimento ? `${obterIdade(item.crianca.data_nascimento)} anos` : '-'}</td>
+                        <td style={tdStyle}>
+                          {temAlerta ? (
+                            <span style={{ backgroundColor: '#fef2f2', color: '#b91c1c', padding: '0.35rem 0.75rem', borderRadius: '0.5rem', fontSize: '12px', fontWeight: 'bold' }}>
+                              ⚠️ Alertas Clínicos
+                            </span>
+                          ) : <span style={{ color: '#94a3b8' }}>-</span>}
+                        </td>
+                        <td style={{ ...tdStyle, fontWeight: '600' }}>
+                          {item.turno} <div style={{ fontSize: '11px', color: '#059669' }}>{item.valor}€</div>
+                        </td>
+                        <td style={tdStyle}>
+                          <button 
+                            type="button" onClick={() => toggleStatusPagamento(item.reservaId, item.statusPagamento)}
+                            style={{ backgroundColor: item.statusPagamento === 'Pago' ? '#ecfdf5' : '#fff7ed', color: item.statusPagamento === 'Pago' ? '#059669' : '#c2410c', border: `1px solid ${item.statusPagamento === 'Pago' ? '#a7f3d0' : '#fed7aa'}`, padding: '0.35rem 0.75rem', borderRadius: '999px', fontSize: '11px', fontWeight: '900', cursor: 'pointer' }}
+                          >
+                            {item.statusPagamento}
+                          </button>
+                        </td>
+                        <td style={tdStyle}>
+                          <button onClick={() => setReservaSelecionada(item)} style={{ padding: '0.5rem 1rem', backgroundColor: '#f1f5f9', color: '#0f172a', border: '1px solid #cbd5e1', borderRadius: '0.5rem', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px' }}>
+                            {isEn ? 'View Details' : 'Ver Ficha'}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
-      )}
+      </div>
 
-      {/* O MODAL COM A FICHA COMPLETA (HERDADO DA VISTA BÁSICA) */}
+      {/* O MODAL COM A FICHA COMPLETA (ATUALIZADA) */}
       {reservaSelecionada && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.8)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', backdropFilter: 'blur(4px)' }}>
-          <div style={{ backgroundColor: 'white', width: '100%', maxWidth: '800px', borderRadius: '1.5rem', overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column', maxHeight: '90vh' }}>
+          <div style={{ backgroundColor: 'white', width: '100%', maxWidth: '850px', borderRadius: '1.5rem', overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column', maxHeight: '90vh' }}>
             
             <div style={{ padding: '1.5rem 2rem', backgroundColor: '#0f172a', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: '900' }}>{isEn ? 'Booking Details' : 'Ficha de Inscrição'}</h2>
+                <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: '900' }}>{isEn ? 'Booking Details' : 'Ficha Completa de Inscrição'}</h2>
                 <p style={{ margin: '0.25rem 0 0 0', color: '#94a3b8', fontSize: '14px' }}>Ref: {reservaSelecionada.reservaId}</p>
               </div>
               <button onClick={() => setReservaSelecionada(null)} style={{ background: 'none', border: 'none', color: 'white', fontSize: '2rem', cursor: 'pointer', lineHeight: 1 }}>&times;</button>
@@ -373,48 +309,54 @@ export default function GestaoReservasParceiro({ params }: { params: Promise<{ l
                   <DetailRow label={isEn ? "Name" : "Nome"} value={reservaSelecionada.crianca?.nome} />
                   <DetailRow label={isEn ? "Birth Date" : "Data Nasc."} value={reservaSelecionada.crianca?.data_nascimento} />
                   <DetailRow label={isEn ? "Gender" : "Género"} value={reservaSelecionada.crianca?.sexo} />
-                  <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: '#fff7ed', borderRadius: '0.5rem', border: '1px solid #fed7aa' }}>
-                    <span style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#c2410c', textTransform: 'uppercase', marginBottom: '0.25rem' }}>{isEn ? 'Allergies / Restrictions' : 'Alergias / Restrições'}</span>
-                    <span style={{ fontSize: '14px', color: '#9a3412', fontWeight: 'bold' }}>{reservaSelecionada.crianca?.restricoes_alimentares || (isEn ? 'None declared' : 'Nenhuma declarada')}</span>
+                  <DetailRow label={isEn ? "Tax ID" : "NIF"} value={reservaSelecionada.crianca?.nif} />
+                  
+                  <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px dashed #e2e8f0' }}>
+                    <h4 style={{ fontSize: '12px', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', marginBottom: '0.75rem' }}>Logística Extra</h4>
+                    <DetailRow label="Sabe nadar?" value={reservaSelecionada.crianca?.sabe_nadar} />
+                    <DetailRow label="Bicicleta?" value={reservaSelecionada.crianca?.sabe_andar_bicicleta} />
+                    <DetailRow label="T-Shirt (Brinde)" value={reservaSelecionada.crianca?.tamanho_tshirt} />
                   </div>
                 </div>
 
-                <div style={modalCardStyle}>
-                  <h3 style={modalTitleStyle}>🛡️ {isEn ? 'Security & Contacts (Guardian)' : 'Segurança e Contactos (Pai/Mãe)'}</h3>
-                  <DetailRow label={isEn ? "Guardian" : "Encarregado"} value={reservaSelecionada.pai?.nome_completo} />
-                  <DetailRow label={isEn ? "Phone" : "Telemóvel"} value={reservaSelecionada.pai?.telefone} />
-                  <DetailRow label="Email" value={reservaSelecionada.pai?.email} />
-                  <DetailRow label="NIF" value={reservaSelecionada.pai?.nif || (isEn ? 'Not provided' : 'Não fornecido')} />
+                <div style={{...modalCardStyle, borderColor: '#fecaca'}}>
+                  <h3 style={{...modalTitleStyle, color: '#991b1b'}}>🏥 {isEn ? 'Medical Profile' : 'Perfil Médico e Alergias'}</h3>
+                  <DetailRow label="Tipo Sanguíneo" value={reservaSelecionada.crianca?.tipo_sanguineo} />
                   
-                  <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: '#fef2f2', borderRadius: '0.5rem', border: '1px solid #fecaca' }}>
-                    <span style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#e11d48', textTransform: 'uppercase', marginBottom: '0.25rem' }}>{isEn ? 'Emergency Contact (Alt.)' : 'Contacto de Emergência (Alt.)'}</span>
-                    <span style={{ fontSize: '14px', color: '#9f1239', fontWeight: 'bold' }}>{reservaSelecionada.pai?.contacto_emergencia || (isEn ? '⚠️ Missing Data' : '⚠️ Faltam Dados')}</span>
+                  <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: '#fff7ed', borderRadius: '0.5rem', border: '1px solid #fed7aa' }}>
+                    <span style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#c2410c', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Restrições Alimentares</span>
+                    <span style={{ fontSize: '14px', color: '#9a3412', fontWeight: 'bold' }}>{reservaSelecionada.crianca?.restricoes_alimentares || 'Nenhuma declarada'}</span>
                   </div>
+                  
+                  <div style={{ marginTop: '1rem' }}>
+                    <span style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#991b1b', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Doenças Crónicas</span>
+                    <p style={{ margin: '0 0 1rem 0', fontSize: '13px', color: '#475569', fontWeight: '600' }}>{reservaSelecionada.crianca?.doencas_cronicas || 'Não'}</p>
+                    
+                    <span style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#991b1b', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Medicação Regular</span>
+                    <p style={{ margin: '0 0 1rem 0', fontSize: '13px', color: '#475569', fontWeight: '600' }}>{reservaSelecionada.crianca?.medicacao_regular || 'Não'}</p>
 
-                  <div style={{ marginTop: '0.5rem', padding: '1rem', backgroundColor: '#f0fdf4', borderRadius: '0.5rem', border: '1px solid #bbf7d0' }}>
-                    <span style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#059669', textTransform: 'uppercase', marginBottom: '0.25rem' }}>{isEn ? 'Authorized Pickup Persons' : 'Autorizados a Levantar'}</span>
-                    <span style={{ fontSize: '14px', color: '#064e3b', fontWeight: '600', whiteSpace: 'pre-wrap' }}>{reservaSelecionada.pai?.pessoas_autorizadas_recolha || (isEn ? '⚠️ Missing Data' : '⚠️ Faltam Dados')}</span>
+                    <span style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#991b1b', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Limitações Físicas</span>
+                    <p style={{ margin: 0, fontSize: '13px', color: '#475569', fontWeight: '600' }}>{reservaSelecionada.crianca?.limitacoes_fisicas || 'Não'}</p>
                   </div>
                 </div>
 
                 <div style={{ ...modalCardStyle, gridColumn: '1 / -1' }}>
-                  <h3 style={modalTitleStyle}>📅 {isEn ? 'Program Details' : 'Detalhes do Programa'}</h3>
-                  <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
-                    <div style={{ flex: 1 }}>
-                      <DetailRow label={isEn ? "Program" : "Campo"} value={reservaSelecionada.campNome} />
-                      <DetailRow label={isEn ? "Shift" : "Turno"} value={reservaSelecionada.turno} />
-                      <DetailRow label={isEn ? "Effective Days" : "Dias Efetivos"} value={reservaSelecionada.extras?.dias_inscritos || (isEn ? 'Full Week' : 'Semana Completa')} />
-                      <DetailRow label={isEn ? "Financial Status" : "Estado Financeiro"} value={reservaSelecionada.statusPagamento === 'Pago' ? (isEn ? 'Paid' : 'Pago') : (isEn ? 'Pending' : 'Pendente')} />
+                  <h3 style={modalTitleStyle}>🛡️ {isEn ? 'Guardian & Contacts' : 'Segurança e Contactos do Encarregado'}</h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '2rem' }}>
+                    <div>
+                      <DetailRow label={isEn ? "Guardian" : "Encarregado"} value={reservaSelecionada.pai?.nome_completo} />
+                      <DetailRow label={isEn ? "Phone" : "Telemóvel Principal"} value={reservaSelecionada.pai?.telefone} />
+                      <DetailRow label="Email" value={reservaSelecionada.pai?.email} />
                     </div>
-                    <div style={{ flex: 1, backgroundColor: '#f1f5f9', padding: '1rem', borderRadius: '0.5rem' }}>
-                      <span style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', marginBottom: '0.5rem' }}>{isEn ? 'Extras Contracted:' : 'Extras Contratados:'}</span>
-                      <ul style={{ margin: 0, paddingLeft: '1.25rem', fontSize: '14px', color: '#334155', fontWeight: '600' }}>
-                        {reservaSelecionada.extras?.extAlimentacao ? <li>{isEn ? 'Meals Included' : 'Refeições Incluídas'}</li> : null}
-                        {reservaSelecionada.extras?.extAlojamento ? <li>{isEn ? 'Accommodation' : 'Alojamento/Dormida'}</li> : null}
-                        {reservaSelecionada.extras?.extTransporte ? <li>{isEn ? 'Transport' : 'Transporte'}</li> : null}
-                        {reservaSelecionada.extras?.extProlongamento ? <li>{isEn ? 'Extended Hours' : 'Prolongamento de Horário'}</li> : null}
-                        {!reservaSelecionada.extras?.extAlimentacao && !reservaSelecionada.extras?.extAlojamento && !reservaSelecionada.extras?.extTransporte && !reservaSelecionada.extras?.extProlongamento && <li>{isEn ? 'No extras selected' : 'Nenhum extra selecionado'}</li>}
-                      </ul>
+                    <div>
+                      <div style={{ padding: '1rem', backgroundColor: '#fef2f2', borderRadius: '0.5rem', border: '1px solid #fecaca', marginBottom: '1rem' }}>
+                        <span style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#e11d48', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Contacto de Emergência (Alt.)</span>
+                        <span style={{ fontSize: '14px', color: '#9f1239', fontWeight: 'bold' }}>{reservaSelecionada.pai?.contacto_emergencia || '⚠️ Faltam Dados'}</span>
+                      </div>
+                      <div style={{ padding: '1rem', backgroundColor: '#f0fdf4', borderRadius: '0.5rem', border: '1px solid #bbf7d0' }}>
+                        <span style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#059669', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Autorizados a Levantar</span>
+                        <span style={{ fontSize: '14px', color: '#064e3b', fontWeight: '600', whiteSpace: 'pre-wrap' }}>{reservaSelecionada.pai?.pessoas_autorizadas_recolha || '⚠️ Faltam Dados'}</span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -432,8 +374,7 @@ export default function GestaoReservasParceiro({ params }: { params: Promise<{ l
 // ESTILOS DE COMPONENTES
 const statCardStyle = { display: 'flex', flexDirection: 'column' as const, gap: '0.25rem', backgroundColor: 'white', padding: '1.5rem', borderRadius: '1rem', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' };
 const statLabelStyle = { fontSize: '11px', fontWeight: '800', color: '#64748b', letterSpacing: '0.05em' };
-const analyticsLabelStyle = { fontSize: '11px', fontWeight: '800', color: '#94a3b8', letterSpacing: '0.05em' };
-const thStyle = { padding: '1rem 1.5rem', fontSize: '11px', fontWeight: '800', color: '#475569', letterSpacing: '0.05em' };
+const thStyle = { padding: '1rem 1.5rem', fontSize: '11px', fontWeight: '800', color: '#475569', letterSpacing: '0.05em', whiteSpace: 'nowrap' as const };
 const tdStyle = { padding: '1.25rem 1.5rem', color: '#334155', verticalAlign: 'middle' };
 const selectDropdownStyle = { width: '100%', padding: '0.875rem 1rem', borderRadius: '0.75rem', border: '1px solid #a7f3d0', backgroundColor: '#f0fdf4', color: '#064e3b', fontWeight: '800', fontSize: '14px', outline: 'none', appearance: 'none' as const, cursor: 'pointer', backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23064e3b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1.2em' };
 
@@ -443,6 +384,6 @@ const modalTitleStyle = { margin: '0 0 1.5rem 0', fontSize: '1.125rem', fontWeig
 const DetailRow = ({ label, value }: { label: string, value: string }) => (
   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem', borderBottom: '1px dashed #f1f5f9', paddingBottom: '0.25rem' }}>
     <span style={{ fontSize: '13px', color: '#64748b', fontWeight: 'bold' }}>{label}:</span>
-    <span style={{ fontSize: '14px', color: '#0f172a', fontWeight: '700', textAlign: 'right' }}>{value || 'N/A'}</span>
+    <span style={{ fontSize: '14px', color: '#0f172a', fontWeight: '700', textAlign: 'right', marginLeft: '1rem' }}>{value || 'N/A'}</span>
   </div>
 );

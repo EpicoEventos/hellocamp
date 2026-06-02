@@ -53,7 +53,14 @@ export default function CheckoutPage({ params }: { params: Promise<{ lang: strin
   const [showModal, setShowModal] = useState(false);
   const [indexToAssign, setIndexToAssign] = useState<number | null>(null);
   const [savingChild, setSavingChild] = useState(false);
-  const [newChild, setNewChild] = useState({ nome: '', nif: '', data_nascimento: '', sexo: '', restricoes_alimentares: '' });
+  
+  // Estado atualizado com os novos campos clínicos e logísticos
+  const [newChild, setNewChild] = useState({ 
+    nome: '', nif: '', data_nascimento: '', sexo: '', 
+    restricoes_alimentares: '', tipo_sanguineo: '', doencas_cronicas: '', 
+    medicacao_regular: '', limitacoes_fisicas: '', sabe_nadar: '', 
+    sabe_andar_bicicleta: '', tamanho_tshirt: '' 
+  });
 
   useEffect(() => {
     const fetchDados = async () => {
@@ -99,7 +106,12 @@ export default function CheckoutPage({ params }: { params: Promise<{ lang: strin
   const precoFinalTotal = (precoBaseUnitario + totalExtrasPorCrianca) * quantidade;
 
   const openNewChildModal = (index: number) => {
-    setNewChild({ nome: '', nif: '', data_nascimento: '', sexo: '', restricoes_alimentares: '' });
+    setNewChild({ 
+      nome: '', nif: '', data_nascimento: '', sexo: '', 
+      restricoes_alimentares: '', tipo_sanguineo: '', doencas_cronicas: '', 
+      medicacao_regular: '', limitacoes_fisicas: '', sabe_nadar: '', 
+      sabe_andar_bicicleta: '', tamanho_tshirt: '' 
+    });
     setIndexToAssign(index);
     setShowModal(true);
   };
@@ -208,9 +220,10 @@ export default function CheckoutPage({ params }: { params: Promise<{ lang: strin
         </div>
       )}
 
+      {/* MODAL ADICIONAR NOVA CRIANÇA */}
       {showModal && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.7)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', backdropFilter: 'blur(4px)' }}>
-          <div style={{ backgroundColor: 'white', width: '100%', maxWidth: '500px', borderRadius: '1.5rem', padding: '2.5rem', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', position: 'relative' }}>
+          <div style={{ backgroundColor: 'white', width: '100%', maxWidth: '600px', borderRadius: '1.5rem', padding: '2.5rem', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', position: 'relative', maxHeight: '90vh', overflowY: 'auto' }}>
             <button onClick={() => setShowModal(false)} style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: '#64748b' }}>×</button>
             <h3 style={{ fontSize: '1.5rem', fontWeight: '900', color: '#0f172a', marginBottom: '1.5rem' }}>{isEn ? 'Add New Participant' : 'Adicionar Novo Participante'}</h3>
             
@@ -219,24 +232,23 @@ export default function CheckoutPage({ params }: { params: Promise<{ lang: strin
                 <label style={labelStyle}>{isEn ? 'Full Name' : 'Nome Completo'} *</label>
                 <input type="text" required value={newChild.nome} onChange={e => setNewChild({...newChild, nome: e.target.value})} style={inputStyle} />
               </div>
-              <div style={{ display: 'flex', gap: '1rem' }}>
-                <div style={{ flex: 1 }}>
-                  <label style={labelStyle}>{isEn ? 'Date of Birth' : 'Data Nascimento'} *</label>
+              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                <div style={{ flex: '1 1 150px' }}>
+                  <label style={labelStyle}>{isEn ? 'Date of Birth' : 'Data Nasc.'} *</label>
                   <input type="date" required value={newChild.data_nascimento} onChange={e => setNewChild({...newChild, data_nascimento: e.target.value})} style={inputStyle} />
                 </div>
-                <div style={{ flex: 1 }}>
+                <div style={{ flex: '1 1 150px' }}>
                   <label style={labelStyle}>{isEn ? 'Gender' : 'Sexo'} *</label>
                   <select required value={newChild.sexo} onChange={e => setNewChild({...newChild, sexo: e.target.value})} style={selectStyle}>
-                    <option value="">Selecione...</option>
-                    <option value="Masculino">{isEn ? 'Male' : 'Masculino'}</option>
-                    <option value="Feminino">{isEn ? 'Female' : 'Feminino'}</option>
-                    <option value="Prefiro não dizer">{isEn ? 'Prefer not to say' : 'Prefiro não dizer'}</option>
+                    <option value="">Selecione...</option><option value="Masculino">{isEn ? 'Male' : 'Masculino'}</option><option value="Feminino">{isEn ? 'Female' : 'Feminino'}</option><option value="Prefiro não dizer">{isEn ? 'Prefer not to say' : 'Prefiro não dizer'}</option>
                   </select>
                 </div>
-              </div>
-              <div>
-                <label style={labelStyle}>{isEn ? 'NIF' : 'NIF da Criança'}</label>
-                <input type="text" value={newChild.nif} onChange={e => setNewChild({...newChild, nif: e.target.value})} style={inputStyle} placeholder="Opcional" />
+                <div style={{ flex: '1 1 150px' }}>
+                  <label style={labelStyle}>{isEn ? 'Blood Type' : 'Tipo Sanguíneo'}</label>
+                  <select value={newChild.tipo_sanguineo} onChange={e => setNewChild({...newChild, tipo_sanguineo: e.target.value})} style={selectStyle}>
+                    <option value="">N/A</option><option value="A+">A+</option><option value="A-">A-</option><option value="B+">B+</option><option value="B-">B-</option><option value="AB+">AB+</option><option value="AB-">AB-</option><option value="O+">O+</option><option value="O-">O-</option>
+                  </select>
+                </div>
               </div>
               <div>
                 <label style={labelStyle}>{isEn ? 'Allergies / Restrictions' : 'Alergias / Restrições'}</label>
@@ -255,6 +267,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ lang: strin
         <div style={{ flex: '1 1 60%', minWidth: '320px', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
             
+            {/* SELEÇÃO DE PARTICIPANTES */}
             <section style={{ backgroundColor: 'white', padding: '2.5rem', borderRadius: '1.5rem', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
               <h2 style={{ fontSize: '1.25rem', fontWeight: '800', margin: 0, marginBottom: '1.5rem' }}>{isEn ? 'Select Participants' : 'Selecionar Participantes'}</h2>
 
@@ -299,14 +312,16 @@ export default function CheckoutPage({ params }: { params: Promise<{ lang: strin
                       </button>
                     </div>
 
+                    {/* FICHA DETALHADA E CLÍNICA INLINE */}
                     {childInfo && (
                       <div style={{ marginTop: '1.5rem', backgroundColor: '#f8fafc', padding: '1.5rem', borderRadius: '1rem', border: '1px solid #e2e8f0' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-                          <h4 style={{ fontSize: '13px', fontWeight: '800', color: '#0f172a', textTransform: 'uppercase' }}>{isEn ? 'Verify Details' : 'Verificar Detalhes'}</h4>
-                          <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>💾 {isEn ? 'Auto-saves changes' : 'Grava alterações autom.'}</span>
+                          <h4 style={{ fontSize: '13px', fontWeight: '800', color: '#0f172a', textTransform: 'uppercase' }}>{isEn ? 'Verify Details & Safety' : 'Verificar Detalhes de Segurança'}</h4>
+                          <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>💾 {isEn ? 'Auto-saves' : 'Grava autom.'}</span>
                         </div>
                         
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+                          {/* Dados Pessoais */}
                           <div style={{ gridColumn: '1 / -1' }}>
                             <label style={labelStyle}>{isEn ? 'Full Name' : 'Nome Completo'}</label>
                             <input type="text" required value={childInfo.nome || ''} onChange={e => handleUpdateLocalCrianca(childId, 'nome', e.target.value)} onBlur={e => handleSaveDBCrianca(childId, 'nome', e.target.value)} style={inputStyle} />
@@ -318,18 +333,35 @@ export default function CheckoutPage({ params }: { params: Promise<{ lang: strin
                           <div>
                             <label style={labelStyle}>{isEn ? 'Gender' : 'Sexo'}</label>
                             <select value={childInfo.sexo || ''} onChange={e => {handleUpdateLocalCrianca(childId, 'sexo', e.target.value); handleSaveDBCrianca(childId, 'sexo', e.target.value);}} style={selectStyle}>
-                              <option value="Masculino">{isEn ? 'Male' : 'Masculino'}</option>
-                              <option value="Feminino">{isEn ? 'Female' : 'Feminino'}</option>
-                              <option value="Prefiro não dizer">{isEn ? 'Prefer not to say' : 'Prefiro não dizer'}</option>
+                              <option value="Masculino">{isEn ? 'Male' : 'Masculino'}</option><option value="Feminino">{isEn ? 'Female' : 'Feminino'}</option><option value="Prefiro não dizer">{isEn ? 'Prefer not to say' : 'Prefiro não dizer'}</option>
+                            </select>
+                          </div>
+                          
+                          {/* Logística */}
+                          <div>
+                            <label style={labelStyle}>{isEn ? 'T-Shirt Size' : 'Tamanho T-Shirt'}</label>
+                            <select value={childInfo.tamanho_tshirt || ''} onChange={e => {handleUpdateLocalCrianca(childId, 'tamanho_tshirt', e.target.value); handleSaveDBCrianca(childId, 'tamanho_tshirt', e.target.value);}} style={selectStyle}>
+                              <option value="">N/A</option><option value="5-6 Anos">5-6 Anos</option><option value="7-8 Anos">7-8 Anos</option><option value="9-11 Anos">9-11 Anos</option><option value="12-14 Anos">12-14 Anos</option><option value="S Adulto">S</option><option value="M Adulto">M</option><option value="L Adulto">L</option>
+                            </select>
+                          </div>
+                          
+                          {/* Dados Médicos */}
+                          <div style={{ gridColumn: '1 / -1', borderTop: '1px solid #cbd5e1', paddingTop: '1rem', marginTop: '0.5rem' }}>
+                            <label style={{...labelStyle, color: '#991b1b'}}>{isEn ? 'Medical Profile' : 'Perfil Médico (Alergias e Condições)'}</label>
+                          </div>
+                          <div>
+                            <label style={labelStyle}>{isEn ? 'Blood Type' : 'Tipo Sanguíneo'}</label>
+                            <select value={childInfo.tipo_sanguineo || ''} onChange={e => {handleUpdateLocalCrianca(childId, 'tipo_sanguineo', e.target.value); handleSaveDBCrianca(childId, 'tipo_sanguineo', e.target.value);}} style={selectStyle}>
+                              <option value="">N/A</option><option value="A+">A+</option><option value="A-">A-</option><option value="B+">B+</option><option value="B-">B-</option><option value="AB+">AB+</option><option value="AB-">AB-</option><option value="O+">O+</option><option value="O-">O-</option>
                             </select>
                           </div>
                           <div style={{ gridColumn: '1 / -1' }}>
-                            <label style={labelStyle}>{isEn ? 'NIF' : 'NIF da Criança'}</label>
-                            <input type="text" value={childInfo.nif || ''} onChange={e => handleUpdateLocalCrianca(childId, 'nif', e.target.value)} onBlur={e => handleSaveDBCrianca(childId, 'nif', e.target.value)} style={inputStyle} placeholder="Opcional" />
+                            <label style={labelStyle}>{isEn ? 'Food Allergies / Restrictions' : 'Alergias Alimentares'}</label>
+                            <input type="text" value={childInfo.restricoes_alimentares || ''} onChange={e => handleUpdateLocalCrianca(childId, 'restricoes_alimentares', e.target.value)} onBlur={e => handleSaveDBCrianca(childId, 'restricoes_alimentares', e.target.value)} style={inputStyle} placeholder={isEn ? "None" : "Nenhuma"} />
                           </div>
                           <div style={{ gridColumn: '1 / -1' }}>
-                            <label style={labelStyle}>{isEn ? 'Medical or Dietary Restrictions' : 'Alergias ou Restrições Alimentares'}</label>
-                            <input type="text" value={childInfo.restricoes_alimentares || ''} onChange={e => handleUpdateLocalCrianca(childId, 'restricoes_alimentares', e.target.value)} onBlur={e => handleSaveDBCrianca(childId, 'restricoes_alimentares', e.target.value)} style={inputStyle} placeholder={isEn ? "None" : "Nenhuma"} />
+                            <label style={labelStyle}>{isEn ? 'Chronic Diseases / Medication' : 'Doenças Crónicas ou Medicação Regular'}</label>
+                            <input type="text" value={childInfo.doencas_cronicas || ''} onChange={e => handleUpdateLocalCrianca(childId, 'doencas_cronicas', e.target.value)} onBlur={e => handleSaveDBCrianca(childId, 'doencas_cronicas', e.target.value)} style={inputStyle} placeholder={isEn ? "None" : "Nenhuma"} />
                           </div>
                         </div>
                       </div>
@@ -369,6 +401,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ lang: strin
           </form>
         </div>
 
+        {/* SIDEBAR RESUMO FINANCEIRO */}
         <aside style={{ flex: '1 1 30%', minWidth: '320px', position: 'sticky', top: '2rem' }}>
           <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '1.5rem', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
             <h3 style={{ fontSize: '1.125rem', fontWeight: '900', marginBottom: '1.5rem', borderBottom: '2px solid #f1f5f9', paddingBottom: '1rem' }}>
@@ -378,7 +411,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ lang: strin
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
               <div>
                 <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 'bold', textTransform: 'uppercase' }}>Programa</span>
-                <p style={{ fontSize: '15px', fontWeight: '800', color: '#0f172a', margin: 0 }}>{turnoSelecionado?.nome || campo.nome}</p>
+                <p style={{ fontSize: '15px', fontWeight: '800', color: '#0f172a', margin: 0 }}>{turnoSelecionado?.nome || campo?.nome}</p>
               </div>
               <div>
                 <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 'bold', textTransform: 'uppercase' }}>Duração</span>
