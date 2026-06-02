@@ -18,7 +18,12 @@ export default function ListaCriancas({ params }: { params: Promise<{ lang: stri
     const fetchCriancas = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
-      const { data } = await supabase.from('criancas').select('*').eq('cliente_id', session.user.id).order('created_at', { ascending: false });
+      const { data } = await supabase
+        .from('criancas')
+        .select('*')
+        .eq('cliente_id', session.user.id)
+        .order('created_at', { ascending: false });
+      
       setCriancas(data || []);
       setLoading(false);
     };
@@ -26,10 +31,29 @@ export default function ListaCriancas({ params }: { params: Promise<{ lang: stri
   }, []);
 
   const handleCriarNovaCrianca = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
-    const { data } = await supabase.from('criancas').insert({ cliente_id: session.user.id, nome: 'Novo Participante' }).select().single();
-    if (data) router.push(`/${lang}/cliente/criancas/${data.id}`);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      
+      const { data, error } = await supabase
+        .from('criancas')
+        .insert({ cliente_id: session.user.id, nome: 'Novo Participante' })
+        .select()
+        .single();
+      
+      if (error) {
+        alert("Erro ao criar perfil: " + error.message);
+        console.error(error);
+        return;
+      }
+
+      if (data) {
+        // Redireciona para o URL correto consoante a sua estrutura de pastas
+        router.push(`/${lang}/cliente/criancas/${data.id}`);
+      }
+    } catch (err: any) {
+      alert("Ocorreu um erro inesperado: " + err.message);
+    }
   };
 
   const calcularIdade = (dataNasc: string) => {
@@ -47,7 +71,7 @@ export default function ListaCriancas({ params }: { params: Promise<{ lang: stri
             {isEn ? 'My Children' : 'Os Meus Filhos'}
           </h1>
           <p className="text-slate-500 mt-2 text-sm md:text-base">
-            {isEn ? 'Manage participant profiles for faster bookings.' : 'Gira os perfis dos participantes para reservas mais rápidas.'}
+            {isEn ? 'Manage participant profiles for faster bookings.' : 'Gira os perfis dos participantes para reservas mais rápidas e completas.'}
           </p>
         </div>
         
@@ -70,12 +94,17 @@ export default function ListaCriancas({ params }: { params: Promise<{ lang: stri
           {criancas.map(c => {
             const idade = calcularIdade(c.data_nascimento);
             return (
-              <Link key={c.id} href={`/${lang}/cliente/criancas/${c.id}`} className="bg-white p-6 rounded-2xl border border-slate-200 no-underline text-inherit flex flex-col shadow-sm hover:shadow-md hover:border-slate-300 transition-all">
-                <h3 className="m-0 text-xl font-black text-slate-900 leading-tight mb-4 truncate">{c.nome}</h3>
+              <Link key={c.id} href={`/${lang}/cliente/criancas/${c.id}`} className="bg-white p-6 rounded-2xl border border-slate-200 no-underline text-inherit flex flex-col shadow-sm hover:shadow-md hover:border-emerald-500 transition-all group">
+                <div className="flex justify-between items-start mb-4">
+                  <h3 className="m-0 text-xl font-black text-slate-900 leading-tight truncate group-hover:text-emerald-700 transition-colors">{c.nome}</h3>
+                  <span className="text-slate-300 group-hover:text-emerald-500 transition-colors">✎</span>
+                </div>
 
                 <div className="flex gap-2 flex-wrap mb-6">
-                  {idade !== null && (
+                  {idade !== null ? (
                     <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-xs font-bold">🎂 {idade} {isEn ? 'years' : 'anos'}</span>
+                  ) : (
+                    <span className="bg-amber-50 text-amber-600 border border-amber-200 px-3 py-1 rounded-full text-xs font-bold">⚠️ Idade em falta</span>
                   )}
                   {c.sexo && (
                     <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-xs font-bold">👤 {c.sexo}</span>
@@ -83,9 +112,9 @@ export default function ListaCriancas({ params }: { params: Promise<{ lang: stri
                 </div>
 
                 <div className="mt-auto pt-4 border-t border-slate-100">
-                  {c.restricoes_alimentares ? (
+                  {c.restricoes_alimentares || c.doencas_cronicas ? (
                     <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs font-bold flex items-center gap-2">
-                      ⚠️ <span className="font-normal truncate">{isEn ? 'Restrictions:' : 'Alergias:'} {c.restricoes_alimentares}</span>
+                      ⚠️ <span className="font-normal truncate">{isEn ? 'Medical Alerts' : 'Alertas Clínicos Ativos'}</span>
                     </div>
                   ) : (
                     <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-xs font-bold flex items-center gap-2">
