@@ -38,7 +38,6 @@ export default function EditarCampo({ params }: { params: Promise<{ lang: string
   const [saving, setSaving] = useState(false);
   const [statusText, setStatusText] = useState("");
   
-  // ESTADOS DO AUTO-SAVE
   const isFirstRender = useRef(true);
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'pending' | 'saving' | 'saved' | 'error'>('idle');
   
@@ -54,19 +53,16 @@ export default function EditarCampo({ params }: { params: Promise<{ lang: string
   const [pais, setPais] = useState("Portugal");
   const [linguas, setLinguas] = useState({ pt: false, en: false, es: false, fr: false, de: false });
 
-  const [faixasSelecionadas, setFaixasSelecionadas] = useState({
-    ca6_9: false,
-    ca10_13: false,
-    ca14_17: false,
-    outra: false
-  });
+  const [faixasSelecionadas, setFaixasSelecionadas] = useState({ ca6_9: false, ca10_13: false, ca14_17: false, outra: false });
   const [idadeManual, setIdadeManual] = useState("");
 
   const [turnos, setTurnos] = useState([{ nome: "", data_inicio: "", data_fim: "", preco: 0, permite_dias: false, preco_dia: 0, vagas: 20 }]);
 
   const [formData, setFormData] = useState({
     nome: "", categoria: "", local: "", Distrito: "", racio_monitores: "", duracao_dias: 7,
-    alimentacao: "Não tem", alojamento: "Não tem", seguro: "Incluído no Preço", descricao: "", regras_termos: "",
+    alimentacao: "Não tem", alojamento: "Não tem", seguro: "Incluído no Preço", 
+    politica_cancelamento: "Moderada (Reembolso a 50% até 15 dias antes)",
+    descricao: "", regras_termos: "",
     extra_alimentacao: 0, tipo_cobranca_alimentacao: "Por Turno", extra_alojamento: 0, tipo_cobranca_alojamento: "Por Turno",
     extra_prolongamento: 0, tipo_cobranca_prolongamento: "Por Turno", extra_transporte: 0, tipo_cobranca_transporte: "Por Turno",
     contrato_parceiro_url: ""
@@ -81,7 +77,8 @@ export default function EditarCampo({ params }: { params: Promise<{ lang: string
       if (data) {
         setFormData({
           ...data,
-          contrato_parceiro_url: data.contrato_parceiro_url || ""
+          contrato_parceiro_url: data.contrato_parceiro_url || "",
+          politica_cancelamento: data.politica_cancelamento || "Moderada (Reembolso a 50% até 15 dias antes)"
         });
         
         if (data.idade) {
@@ -89,7 +86,6 @@ export default function EditarCampo({ params }: { params: Promise<{ lang: string
           const c6_9 = idadesGuardadas.includes("6-9 anos");
           const c10_13 = idadesGuardadas.includes("10-13 anos");
           const c14_17 = idadesGuardadas.includes("14-17 anos");
-          
           const padroes = ["6-9 anos", "10-13 anos", "14-17 anos"];
           const customizadas = idadesGuardadas.filter((s: string) => !padroes.includes(s));
           
@@ -147,9 +143,7 @@ export default function EditarCampo({ params }: { params: Promise<{ lang: string
     return ativas.join(", ");
   };
 
-  const handleFaixasChange = (key: keyof typeof faixasSelecionadas) => {
-    setFaixasSelecionadas(prev => ({ ...prev, [key]: !prev[key] }));
-  };
+  const handleFaixasChange = (key: keyof typeof faixasSelecionadas) => { setFaixasSelecionadas(prev => ({ ...prev, [key]: !prev[key] })); };
 
   const construirStringIdades = () => {
     const lista = [];
@@ -186,7 +180,6 @@ export default function EditarCampo({ params }: { params: Promise<{ lang: string
     } catch (e) { return texto; }
   };
 
-  // LÓGICA CENTRAL DE GRAVAÇÃO (Suporta Clique Manual e Auto-Save)
   const handleUpdate = async (e?: React.FormEvent, isAutoSave = false) => {
     if (e) e.preventDefault();
     
@@ -197,9 +190,7 @@ export default function EditarCampo({ params }: { params: Promise<{ lang: string
         if (!mapPreview) alert(isEn ? "Ensure the map is loaded." : "Garanta que o mapa carregou.");
         else if (images.length === 0) alert(isEn ? "Select a photo." : "Adicione uma fotografia.");
         else alert(isEn ? "Select or enter at least one age bracket." : "Selecione ou digite pelo menos uma faixa etária.");
-      } else {
-        setAutoSaveStatus('error');
-      }
+      } else { setAutoSaveStatus('error'); }
       return;
     }
 
@@ -219,13 +210,8 @@ export default function EditarCampo({ params }: { params: Promise<{ lang: string
         return { url: publicUrlData.publicUrl, isMain: img.isMain };
       }));
 
-      // Atualiza o estado das imagens para que no próximo auto-save não voltem a ser carregadas
       if (images.some(img => img.file)) {
-      setImages(uploadedImages.map(img => ({ 
-       url: img.url, 
-       preview: img.url || '', // Resolve o erro do TypeScript
-       isMain: img.isMain 
-       })));
+        setImages(uploadedImages.map(img => ({ url: img.url, preview: img.url || '', isMain: img.isMain })));
       }
 
       const mainImageUrl = uploadedImages.find(i => i.isMain)?.url || uploadedImages[0]?.url;
@@ -240,7 +226,6 @@ export default function EditarCampo({ params }: { params: Promise<{ lang: string
         return { nome: doc.name, url: publicUrlData.publicUrl };
       }));
 
-      // Atualiza documentos para não reenviar
       if (novosDocs.length > 0) {
         setDocumentosExistentes(prev => [...prev, ...novosDocs]);
         setDocumentos([]);
@@ -252,12 +237,12 @@ export default function EditarCampo({ params }: { params: Promise<{ lang: string
 
       const [
         nome_en, categoria_en, local_en, idade_en, descricao_en,
-        alimentacao_en, alojamento_en, seguro_en, Distrito_en, regras_termos_en
+        alimentacao_en, alojamento_en, seguro_en, Distrito_en, regras_termos_en, politica_cancelamento_en
       ] = await Promise.all([
         traduzirParaIngles(formData.nome), traduzirParaIngles(formData.categoria), traduzirParaIngles(formData.local),
         traduzirParaIngles(stringIdadesCompleta), traduzirParaIngles(formData.descricao), traduzirParaIngles(formData.alimentacao),
         traduzirParaIngles(formData.alojamento), traduzirParaIngles(formData.seguro), traduzirParaIngles(formData.Distrito),
-        traduzirParaIngles(formData.regras_termos)
+        traduzirParaIngles(formData.regras_termos), traduzirParaIngles(formData.politica_cancelamento)
       ]);
 
       const turnos_en = await Promise.all(turnos.map(async (t) => ({ ...t, nome: await traduzirParaIngles(t.nome) })));
@@ -272,7 +257,7 @@ export default function EditarCampo({ params }: { params: Promise<{ lang: string
       const { error } = await supabase.from("campos").update({
         nome: formData.nome, categoria: formData.categoria, idade: stringIdadesCompleta, local: formData.local, Distrito: formData.Distrito,
         vagas_totais: totalVagasCalculado, racio_monitores: formData.racio_monitores, duracao_dias: formData.duracao_dias,
-        alimentacao: formData.alimentacao, alojamento: formData.alojamento, seguro: formData.seguro,
+        alimentacao: formData.alimentacao, alojamento: formData.alojamento, seguro: formData.seguro, politica_cancelamento: formData.politica_cancelamento, politica_cancelamento_en,
         descricao: formData.descricao, regras_termos: formData.regras_termos,
         extra_alimentacao: formData.extra_alimentacao, extra_alojamento: formData.extra_alojamento,
         extra_prolongamento: formData.extra_prolongamento, extra_transporte: formData.extra_transporte,
@@ -287,9 +272,7 @@ export default function EditarCampo({ params }: { params: Promise<{ lang: string
       if (!isAutoSave) {
         alert(isEn ? "Camp updated successfully!" : "Campo atualizado com sucesso!");
         router.push(`/${lang}/admin/campos`);
-      } else {
-        setAutoSaveStatus('saved');
-      }
+      } else { setAutoSaveStatus('saved'); }
     } catch (error: any) { 
       if (!isAutoSave) alert("Erro: " + error.message); 
       else setAutoSaveStatus('error');
@@ -298,20 +281,11 @@ export default function EditarCampo({ params }: { params: Promise<{ lang: string
     }
   };
 
-  // O MOTOR DO AUTO-SAVE (Delay de 3 segundos de inatividade)
   useEffect(() => {
     if (loading) return; 
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      return;
-    }
-    
+    if (isFirstRender.current) { isFirstRender.current = false; return; }
     setAutoSaveStatus('pending');
-    
-    const timer = setTimeout(() => {
-      handleUpdate(undefined, true);
-    }, 3000);
-
+    const timer = setTimeout(() => { handleUpdate(undefined, true); }, 3000);
     return () => clearTimeout(timer);
   }, [formData, turnos, linguas, faixasSelecionadas, mapPreview, pais, idadeManual, images, documentos, documentosExistentes]);
 
@@ -324,14 +298,11 @@ export default function EditarCampo({ params }: { params: Promise<{ lang: string
         <Link href={`/${lang}/admin/campos`} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', color: '#64748b', fontWeight: 'bold', textDecoration: 'none', fontSize: '14px', backgroundColor: 'white', padding: '0.5rem 1rem', borderRadius: '999px', border: '1px solid #e2e8f0' }}>
           &larr; {isEn ? 'Back to My Camps' : 'Voltar aos Meus Campos'}
         </Link>
-
-        {/* INDICADOR DE AUTO-SAVE E BOTÃO DE PREVIEW */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           {autoSaveStatus === 'pending' && <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#f59e0b' }}>✎ {isEn ? 'Unsaved changes...' : 'Alogumas alterações não guardadas...'}</span>}
           {autoSaveStatus === 'saving' && <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#3b82f6' }}>⏳ {isEn ? 'Saving...' : 'A gravar automaticamente...'}</span>}
           {autoSaveStatus === 'saved' && <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#10b981' }}>✓ {isEn ? 'Saved' : 'Guardado'}</span>}
           {autoSaveStatus === 'error' && <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#ef4444' }}>⚠ {isEn ? 'Save error' : 'Erro ao gravar'}</span>}
-          
           <a href={`/${lang}/campo/${id}`} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#0f172a', color: 'white', padding: '0.5rem 1.25rem', borderRadius: '999px', fontWeight: 'bold', textDecoration: 'none', fontSize: '13px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
             👁️ {isEn ? 'Preview Camp' : 'Ver Campo Online'}
           </a>
@@ -340,23 +311,8 @@ export default function EditarCampo({ params }: { params: Promise<{ lang: string
 
       <h1 style={{ fontSize: '1.75rem', fontWeight: '900', marginBottom: '2rem' }}>{isEn ? 'Edit Camp' : 'Editar Campo'}</h1>
 
-      {/* AVISO DO ESTADO DO CONTRATO */}
-      {!formData.contrato_parceiro_url ? (
-        <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', padding: '1.5rem', borderRadius: '1rem', marginBottom: '2rem' }}>
-          <p style={{ margin: 0, fontSize: '14px', color: '#dc2626', fontWeight: 'bold' }}>
-            🔴 {isEn ? 'Hidden from public: Waiting for HelloCamp to validate and attach the contract.' : 'Campo Oculto: A aguardar que a HelloCamp valide e anexe o contrato para o seu programa ficar visível ao público.'}
-          </p>
-        </div>
-      ) : (
-        <div style={{ backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0', padding: '1.5rem', borderRadius: '1rem', marginBottom: '2rem' }}>
-          <p style={{ margin: 0, fontSize: '14px', color: '#059669', fontWeight: 'bold' }}>
-            🟢 {isEn ? 'Camp Online: Contract validated by HelloCamp.' : 'Campo Online: Contrato validado pela equipa HelloCamp.'}
-          </p>
-        </div>
-      )}
-
       <form onSubmit={(e) => handleUpdate(e, false)} style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-        {/* 1. INFO BÁSICA */}
+        
         <div style={sectionStyle}>
           <h2 style={sectionTitleStyle}>{isEn ? '1. Basic Information' : '1. Informações Básicas'}</h2>
           <div style={gridStyle}>
@@ -364,52 +320,33 @@ export default function EditarCampo({ params }: { params: Promise<{ lang: string
             <div>
               <label style={labelStyle}>{isEn ? 'Category' : 'Categoria'}</label>
               <select required value={formData.categoria || ''} onChange={e => setFormData({...formData, categoria: e.target.value})} style={selectStyle}>
-                <option value="">{isEn ? 'Select...' : 'Selecione...'}</option><option value="Desporto">Desporto</option><option value="Aventura & Natureza">Aventura & Natureza</option><option value="Tecnologia & Ciência">Tecnologia & Ciência</option><option value="Artes & Criatividade">Artes & Criatividade</option><option value="Línguas">Línguas</option>
+                <option value="Desporto">Desporto</option><option value="Aventura & Natureza">Aventura & Natureza</option><option value="Tecnologia & Ciência">Tecnologia & Ciência</option><option value="Artes & Criatividade">Artes & Criatividade</option><option value="Línguas">Línguas</option>
               </select>
             </div>
             
-            {/* GESTÃO DE IDADES FLEXÍVEL NA EDIÇÃO */}
             <div style={{ gridColumn: '1 / -1' }}>
-              <label style={labelStyle}>{isEn ? 'Age Groups (Select multiple or add manually)' : 'Faixas Etárias (Selecione múltiplas ou adicione manualmente)'}</label>
+              <label style={labelStyle}>{isEn ? 'Age Groups' : 'Faixas Etárias'}</label>
               <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', marginTop: '0.5rem', marginBottom: '1rem' }}>
-                <label style={checkboxLabelStyle}>
-                  <input type="checkbox" checked={faixasSelecionadas.ca6_9} onChange={() => handleFaixasChange('ca6_9')} /> 6-9 {isEn ? 'years' : 'anos'}
-                </label>
-                <label style={checkboxLabelStyle}>
-                  <input type="checkbox" checked={faixasSelecionadas.ca10_13} onChange={() => handleFaixasChange('ca10_13')} /> 10-13 {isEn ? 'years' : 'anos'}
-                </label>
-                <label style={checkboxLabelStyle}>
-                  <input type="checkbox" checked={faixasSelecionadas.ca14_17} onChange={() => handleFaixasChange('ca14_17')} /> 14-17 {isEn ? 'years' : 'anos'}
-                </label>
-                <label style={checkboxLabelStyle}>
-                  <input type="checkbox" checked={faixasSelecionadas.outra} onChange={() => handleFaixasChange('outra')} /> {isEn ? 'Custom range' : 'Outro intervalo'}
-                </label>
+                <label style={checkboxLabelStyle}><input type="checkbox" checked={faixasSelecionadas.ca6_9} onChange={() => handleFaixasChange('ca6_9')} /> 6-9 {isEn ? 'years' : 'anos'}</label>
+                <label style={checkboxLabelStyle}><input type="checkbox" checked={faixasSelecionadas.ca10_13} onChange={() => handleFaixasChange('ca10_13')} /> 10-13 {isEn ? 'years' : 'anos'}</label>
+                <label style={checkboxLabelStyle}><input type="checkbox" checked={faixasSelecionadas.ca14_17} onChange={() => handleFaixasChange('ca14_17')} /> 14-17 {isEn ? 'years' : 'anos'}</label>
+                <label style={checkboxLabelStyle}><input type="checkbox" checked={faixasSelecionadas.outra} onChange={() => handleFaixasChange('outra')} /> {isEn ? 'Custom range' : 'Outro intervalo'}</label>
               </div>
-              
               {faixasSelecionadas.outra && (
-                <div style={{ maxWidth: '300px', animation: 'fadeIn 0.2s' }}>
-                  <label style={{ ...labelStyle, fontSize: '11px', color: '#64748b' }}>{isEn ? 'Custom Age Group (e.g.: 8-15 years)' : 'Faixa Etária Customizada (ex: 8-15 anos)'}</label>
-                  <input 
-                    type="text" 
-                    required={faixasSelecionadas.outra} 
-                    value={idadeManual} 
-                    onChange={e => setIdadeManual(e.target.value)} 
-                    placeholder="Ex: 8-15 anos"
-                    style={inputStyle} 
-                  />
+                <div style={{ maxWidth: '300px' }}>
+                  <input type="text" required={faixasSelecionadas.outra} value={idadeManual} onChange={e => setIdadeManual(e.target.value)} placeholder="Ex: 8-15 anos" style={inputStyle} />
                 </div>
               )}
             </div>
-
-            <div>
-              <label style={labelStyle}>{isEn ? 'Spoken Languages' : 'Línguas Faladas'}</label>
-              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
-                <label style={checkboxLabelStyle}><input type="checkbox" checked={linguas.pt} onChange={() => handleLinguasChange('pt')} /> PT</label>
-                <label style={checkboxLabelStyle}><input type="checkbox" checked={linguas.en} onChange={() => handleLinguasChange('en')} /> EN</label>
-                <label style={checkboxLabelStyle}><input type="checkbox" checked={linguas.es} onChange={() => handleLinguasChange('es')} /> ES</label>
-                <label style={checkboxLabelStyle}><input type="checkbox" checked={linguas.fr} onChange={() => handleLinguasChange('fr')} /> FR</label>
-                <label style={checkboxLabelStyle}><input type="checkbox" checked={linguas.de} onChange={() => handleLinguasChange('de')} /> DE</label>
-              </div>
+            
+            <div style={{ gridColumn: '1 / -1', backgroundColor: '#f8fafc', padding: '1.5rem', borderRadius: '1rem', border: '1px solid #e2e8f0' }}>
+              <label style={{...labelStyle, color: '#0f172a'}}>{isEn ? 'Cancellation Policy' : 'Política de Cancelamento'}</label>
+              <p style={{ fontSize: '13px', color: '#64748b', marginBottom: '1rem' }}>{isEn ? 'Choose standard rules for refunds to protect your business.' : 'Escolha a política de reembolso para proteger o seu negócio e informar os pais.'}</p>
+              <select required value={formData.politica_cancelamento || ''} onChange={e => setFormData({...formData, politica_cancelamento: e.target.value})} style={{...selectStyle, width: '100%', borderColor: '#cbd5e1'}}>
+                <option value="Flexível (Reembolso a 100% até 7 dias antes)">{isEn ? 'Flexible (100% refund up to 7 days before)' : 'Flexível (Reembolso a 100% até 7 dias antes)'}</option>
+                <option value="Moderada (Reembolso a 50% até 15 dias antes)">{isEn ? 'Moderate (50% refund up to 15 days before)' : 'Moderada (Reembolso a 50% até 15 dias antes)'}</option>
+                <option value="Estrita (Sem reembolso após reserva)">{isEn ? 'Strict (No refund after booking)' : 'Estrita (Sem reembolso após reserva)'}</option>
+              </select>
             </div>
           </div>
         </div>

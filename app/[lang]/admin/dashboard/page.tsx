@@ -31,9 +31,15 @@ export default function DashboardMarketing({ params }: { params: Promise<{ lang:
 
       const userId = session.user.id;
 
-      // 1. Busca Perfil
-      const { data: perfil } = await supabase.from('perfis').select('nome_empresa').eq('id', userId).single();
-      if (perfil) setNomeEmpresa(perfil.nome_empresa || (isEn ? "Partner" : "Parceiro"));
+      // 1. Busca Perfil (Correção da coluna empresa_nome e fallback para primeiro nome)
+      const { data: perfil } = await supabase.from('perfis').select('empresa_nome, nome_completo').eq('id', userId).single();
+      
+      if (perfil) {
+        const primeiroNome = perfil.nome_completo ? perfil.nome_completo.split(' ')[0] : null;
+        setNomeEmpresa(perfil.empresa_nome || primeiroNome || (isEn ? "Organizer" : "Organizador"));
+      } else {
+        setNomeEmpresa(isEn ? "Organizer" : "Organizador");
+      }
 
       // 2. Busca Campos do Parceiro para Análise de Conversão
       const { data: campos } = await supabase.from('campos').select('id, nome, contrato_parceiro_url, rating_score, total_reviews, galeria, programas_pdf, imagem').eq('organizador_id', userId);
