@@ -92,7 +92,7 @@ export default function MeusCampos({ params }: { params: Promise<{ lang: string 
                   
                   {/* NOVO BOTÃO: Preview (Ver Campo Online) */}
                   <a href={`/${lang}/campo/${campo.id}`} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 rounded-lg font-bold text-sm no-underline transition-colors">
-                    👁️ {isEn ? 'Preview' : 'Ver Online'}
+                      {isEn ? 'Preview' : 'Ver Online'}
                   </a>
 
                   {campo.contrato_parceiro_url && (
