@@ -50,7 +50,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ lang: strin
   
   const [selecoesCriancas, setSelecoesCriancas] = useState<string[]>(Array(quantidade).fill(""));
 
-  // ESTADO PARA AS RESPOSTAS CUSTOMIZADAS (Mapeado pelo Index do Participante)
+  // ESTADO PARA AS RESPOSTAS CUSTOMIZADAS
   const [respostasCustomizadas, setRespostasCustomizadas] = useState<Record<number, Record<string, string>>>({});
 
   const [showModal, setShowModal] = useState(false);
@@ -164,7 +164,6 @@ export default function CheckoutPage({ params }: { params: Promise<{ lang: strin
     setProcessingStripe(true);
 
     try {
-      // INJETAR AS RESPOSTAS NAS RESERVAS
       const insercoes = selecoesCriancas.map((crianca_id, index) => ({
         cliente_id: user.id, 
         crianca_id: crianca_id, 
@@ -175,7 +174,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ lang: strin
         turno_nome: turnoSelecionado?.nome || 'Programa Base',
         status_pagamento: 'Pendente',
         extras_escolhidos: { extAlimentacao, extAlojamento, extProlongamento, extTransporte, dias_inscritos: diasEfetivos },
-        respostas_customizadas: respostasCustomizadas[index] || {} // Aqui entram as respostas dinâmicas
+        respostas_customizadas: respostasCustomizadas[index] || {}
       }));
 
       const { data: reservasData, error: supabaseError } = await supabase.from('reservas').insert(insercoes).select('id');
@@ -264,6 +263,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ lang: strin
                 </div>
                 <div style={{ flex: '1 1 150px' }}>
                   <label style={labelStyle}>{isEn ? 'Blood Type' : 'Tipo Sanguíneo'}</label>
+                  {/* CORRIGIDO NO MODAL (newChild em vez de childInfo) */}
                   <select value={newChild.tipo_sanguineo} onChange={e => setNewChild({...newChild, tipo_sanguineo: e.target.value})} style={selectStyle}>
                     <option value="">N/A</option><option value="A+">A+</option><option value="A-">A-</option><option value="B+">B+</option><option value="B-">B-</option><option value="AB+">AB+</option><option value="AB-">AB-</option><option value="O+">O+</option><option value="O-">O-</option>
                   </select>
@@ -364,15 +364,17 @@ export default function CheckoutPage({ params }: { params: Promise<{ lang: strin
                             </select>
                           </div>
                           
-                          {/* Dados Médicos */}
-                          <div style={{ gridColumn: '1 / -1', borderTop: '1px solid #cbd5e1', paddingTop: '1rem', marginTop: '0.5rem' }}>
-                            <label style={{...labelStyle, color: '#991b1b'}}>{isEn ? 'Medical Profile' : 'Perfil Médico (Alergias e Condições)'}</label>
-                          </div>
+                          {/* CORRIGIDO TIPO SANGUINEO - Exatamente igual à T-shirt */}
                           <div>
                             <label style={labelStyle}>{isEn ? 'Blood Type' : 'Tipo Sanguíneo'}</label>
                             <select value={childInfo.tipo_sanguineo || ''} onChange={e => {handleUpdateLocalCrianca(childId, 'tipo_sanguineo', e.target.value); handleSaveDBCrianca(childId, 'tipo_sanguineo', e.target.value);}} style={selectStyle}>
                               <option value="">N/A</option><option value="A+">A+</option><option value="A-">A-</option><option value="B+">B+</option><option value="B-">B-</option><option value="AB+">AB+</option><option value="AB-">AB-</option><option value="O+">O+</option><option value="O-">O-</option>
                             </select>
+                          </div>
+                          
+                          {/* Dados Médicos */}
+                          <div style={{ gridColumn: '1 / -1', borderTop: '1px solid #cbd5e1', paddingTop: '1rem', marginTop: '0.5rem' }}>
+                            <label style={{...labelStyle, color: '#991b1b'}}>{isEn ? 'Medical Profile' : 'Perfil Médico (Alergias e Condições)'}</label>
                           </div>
                           <div style={{ gridColumn: '1 / -1' }}>
                             <label style={labelStyle}>{isEn ? 'Food Allergies / Restrictions' : 'Alergias Alimentares'}</label>
@@ -494,4 +496,5 @@ export default function CheckoutPage({ params }: { params: Promise<{ lang: strin
 
 const labelStyle = { display: 'block', fontSize: '11px', fontWeight: '800', color: '#64748b', textTransform: 'uppercase' as const, marginBottom: '0.4rem' };
 const inputStyle = { width: '100%', padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid #cbd5e1', backgroundColor: 'white', fontSize: '14px', color: '#0f172a', outline: 'none' };
-const selectStyle = { padding: '0.75rem 1rem', borderRadius: '0.75rem', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', fontSize: '14px', fontWeight: '600', color: '#0f172a', outline: 'none', appearance: 'none' as const, cursor: 'pointer', backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1.2em' };
+// PaddingRight 2.5rem adicionado aqui para resolver o texto cortado
+const selectStyle = { padding: '0.75rem 1rem', paddingRight: '2.5rem', borderRadius: '0.75rem', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', fontSize: '14px', fontWeight: '600', color: '#0f172a', outline: 'none', appearance: 'none' as const, cursor: 'pointer', backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1.2em' };
