@@ -50,11 +50,13 @@ export default function CheckoutPage({ params }: { params: Promise<{ lang: strin
   
   const [selecoesCriancas, setSelecoesCriancas] = useState<string[]>(Array(quantidade).fill(""));
 
+  // ESTADO PARA AS RESPOSTAS CUSTOMIZADAS (Mapeado pelo Index do Participante)
+  const [respostasCustomizadas, setRespostasCustomizadas] = useState<Record<number, Record<string, string>>>({});
+
   const [showModal, setShowModal] = useState(false);
   const [indexToAssign, setIndexToAssign] = useState<number | null>(null);
   const [savingChild, setSavingChild] = useState(false);
   
-  // Estado atualizado com os novos campos clínicos e logísticos
   const [newChild, setNewChild] = useState({ 
     nome: '', nif: '', data_nascimento: '', sexo: '', 
     restricoes_alimentares: '', tipo_sanguineo: '', doencas_cronicas: '', 
@@ -143,6 +145,16 @@ export default function CheckoutPage({ params }: { params: Promise<{ lang: strin
     await supabase.from('criancas').update({ [campoTabela]: valor }).eq('id', idDaCrianca);
   };
 
+  const handleRespostaCustomizada = (participantIndex: number, pergunta: string, resposta: string) => {
+    setRespostasCustomizadas(prev => ({
+      ...prev,
+      [participantIndex]: {
+        ...(prev[participantIndex] || {}),
+        [pergunta]: resposta
+      }
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (selecoesCriancas.some(c => c === "")) {
@@ -152,13 +164,18 @@ export default function CheckoutPage({ params }: { params: Promise<{ lang: strin
     setProcessingStripe(true);
 
     try {
-      const insercoes = selecoesCriancas.map(crianca_id => ({
-        cliente_id: user.id, crianca_id: crianca_id, campo_id: campo.id,
-        organizador_id: campo.organizador_id, quantidade_criancas: 1,
+      // INJETAR AS RESPOSTAS NAS RESERVAS
+      const insercoes = selecoesCriancas.map((crianca_id, index) => ({
+        cliente_id: user.id, 
+        crianca_id: crianca_id, 
+        campo_id: campo.id,
+        organizador_id: campo.organizador_id, 
+        quantidade_criancas: 1,
         valor_total: precoFinalTotal / quantidade,
         turno_nome: turnoSelecionado?.nome || 'Programa Base',
         status_pagamento: 'Pendente',
-        extras_escolhidos: { extAlimentacao, extAlojamento, extProlongamento, extTransporte, dias_inscritos: diasEfetivos }
+        extras_escolhidos: { extAlimentacao, extAlojamento, extProlongamento, extTransporte, dias_inscritos: diasEfetivos },
+        respostas_customizadas: respostasCustomizadas[index] || {} // Aqui entram as respostas dinâmicas
       }));
 
       const { data: reservasData, error: supabaseError } = await supabase.from('reservas').insert(insercoes).select('id');
@@ -207,6 +224,8 @@ export default function CheckoutPage({ params }: { params: Promise<{ lang: strin
   };
 
   if (loading || !campo) return <div style={{ padding: '4rem', textAlign: 'center', fontWeight: 'bold', color: '#64748b' }}>{isEn ? 'Preparing secure checkout...' : 'A preparar a sua reserva de forma segura...'}</div>;
+
+  const temPerguntasCustomizadas = campo?.perguntas_customizadas && campo.perguntas_customizadas.length > 0;
 
   return (
     <main style={{ minHeight: '100vh', backgroundColor: '#f3f4f6', fontFamily: 'sans-serif', paddingBottom: '5rem', paddingTop: '3rem', position: 'relative' }}>
@@ -363,6 +382,37 @@ export default function CheckoutPage({ params }: { params: Promise<{ lang: strin
                             <label style={labelStyle}>{isEn ? 'Chronic Diseases / Medication' : 'Doenças Crónicas ou Medicação Regular'}</label>
                             <input type="text" value={childInfo.doencas_cronicas || ''} onChange={e => handleUpdateLocalCrianca(childId, 'doencas_cronicas', e.target.value)} onBlur={e => handleSaveDBCrianca(childId, 'doencas_cronicas', e.target.value)} style={inputStyle} placeholder={isEn ? "None" : "Nenhuma"} />
                           </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* PERGUNTAS CUSTOMIZADAS DO CAMPO DE FÉRIAS */}
+                    {childInfo && temPerguntasCustomizadas && (
+                      <div style={{ marginTop: '1rem', backgroundColor: '#eff6ff', padding: '1.5rem', borderRadius: '1rem', border: '1px solid #bfdbfe' }}>
+                        <h4 style={{ fontSize: '13px', fontWeight: '800', color: '#1e40af', textTransform: 'uppercase', marginBottom: '1.25rem' }}>
+                          {isEn ? 'Specific Questions for this Camp' : 'Perguntas Específicas do Programa'}
+                        </h4>
+                        
+                        <div style={{ display: 'grid', gap: '1rem' }}>
+                          {campo.perguntas_customizadas.map((perguntaOriginal: string, pIdx: number) => {
+                            // Mostrar a versão traduzida se for inglês e existir tradução
+                            const perguntaVisivel = isEn && campo.perguntas_customizadas_en && campo.perguntas_customizadas_en[pIdx] 
+                                                    ? campo.perguntas_customizadas_en[pIdx] 
+                                                    : perguntaOriginal;
+                            return (
+                              <div key={pIdx}>
+                                <label style={{...labelStyle, color: '#1e3a8a'}}>{perguntaVisivel} *</label>
+                                <input 
+                                  type="text" 
+                                  required
+                                  value={respostasCustomizadas[i]?.[perguntaOriginal] || ''} 
+                                  onChange={e => handleRespostaCustomizada(i, perguntaOriginal, e.target.value)} 
+                                  style={{...inputStyle, borderColor: '#93c5fd'}}
+                                  placeholder={isEn ? 'Your answer...' : 'A sua resposta...'}
+                                />
+                              </div>
+                            )
+                          })}
                         </div>
                       </div>
                     )}
