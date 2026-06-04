@@ -37,16 +37,17 @@ export default function PaginaPesquisa({
       setLoading(true);
       let query = supabase.from("campos").select("*").not("contrato_parceiro_url", "is", null);
 
-      // CORREÇÃO: FILTRAGEM INTELIGENTE PALAVRA A PALAVRA (ESTILO GOOGLE)
+      // CORREÇÃO: FILTRAGEM SUPER INTELIGENTE (LÓGICA "OU")
       if (qParam) {
-        // Parte a frase em palavras isoladas usando os espaços como separador
         const termos = qParam.trim().split(/\s+/);
         
-        // Aplica um filtro para cada palavra individual. 
-        // No Supabase, encadear múltiplos .or() cria uma relação de "E" (AND) entre eles.
-        termos.forEach(termo => {
-          query = query.or(`nome.ilike.%${termo}%,descricao.ilike.%${termo}%,categoria.ilike.%${termo}%,local.ilike.%${termo}%,Distrito.ilike.%${termo}%,nome_en.ilike.%${termo}%,descricao_en.ilike.%${termo}%`);
-        });
+        // Criamos uma lista gigante com todas as palavras. 
+        // Basta que UMA das palavras inseridas bata certo com alguma coisa na BD para o campo aparecer.
+        const orConditions = termos.map(termo => 
+          `nome.ilike.%${termo}%,descricao.ilike.%${termo}%,categoria.ilike.%${termo}%,local.ilike.%${termo}%,Distrito.ilike.%${termo}%,nome_en.ilike.%${termo}%,descricao_en.ilike.%${termo}%`
+        ).join(',');
+
+        query = query.or(orConditions);
       }
 
       if (catParam) query = query.eq("categoria", catParam);
