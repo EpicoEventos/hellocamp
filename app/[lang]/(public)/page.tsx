@@ -96,79 +96,71 @@ export default async function Home({
             <p className="mt-4 text-base text-slate-500 max-w-2xl mx-auto leading-relaxed">{dict.home.descricao_filtros}</p>
           </div>
 
-          <div className="relative bg-white rounded-[2rem] shadow-2xl shadow-slate-200/50 p-6 md:p-8 border border-slate-100 max-w-4xl mx-auto mb-8">
+          <div className="relative bg-white rounded-3xl shadow-xl shadow-slate-200/50 p-6 md:p-10 border border-slate-100 max-w-4xl mx-auto mb-8">
             
-            <div className="absolute -top-4 right-8 z-20 hidden md:block">
-              <Link href={`/${lang}/mapa`} className="inline-flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 rounded-full text-xs font-black uppercase tracking-wider shadow-lg shadow-emerald-600/30 hover:-translate-y-1 transition-transform">
-                📍 {dict.home.ver_mapa}
+            {/* BOTÃO VER MAPA - RESTAURADO À VERSÃO SUBTIL */}
+            <div className="absolute top-5 right-5 z-20 hidden md:block">
+              <Link href={`/${lang}/mapa`} className="inline-flex items-center gap-2 bg-emerald-50 text-emerald-700 px-4 py-2 rounded-full text-xs font-bold no-underline border border-emerald-100 hover:bg-emerald-100 transition-colors">
+                <span>📍</span> {dict.home.ver_mapa}
               </Link>
             </div>
 
-            <form action={`/${lang}/pesquisa`} method="GET" className="mt-4 flex flex-col gap-6 pb-6 md:pb-8">
+            <form action={`/${lang}/pesquisa`} method="GET" className="mt-8 md:mt-4 relative">
               
-              {/* MAIN SEARCH BAR + SUBMIT BUTTON ALIGNED */}
-              <div className="flex flex-col md:flex-row gap-4">
-                <div className="flex-1 relative">
-                  <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
-                    <span className="text-slate-400 text-xl">🔍</span>
-                  </div>
-                  <input 
-                    type="text" 
-                    name="q" 
-                    placeholder={isEn ? "What are you looking for? (e.g. Tennis in Porto, Surf...)" : "O que procura? (ex: Ténis no Porto, Surf na Caparica...)"} 
-                    className="w-full pl-14 pr-4 py-4 md:py-5 rounded-2xl bg-slate-50 border-2 border-slate-100 text-slate-900 text-lg md:text-xl font-bold outline-none focus:border-emerald-500 focus:bg-white transition-all placeholder:text-slate-400 placeholder:font-medium shadow-inner"
-                  />
+              {/* NOVA BARRA DE TEXTO LIVRE - LIMPA E ELEGANTE */}
+              <div className="mb-6 relative">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <span className="text-slate-400 text-lg">🔍</span>
                 </div>
-                
-                <button type="submit" className="w-full md:w-auto px-10 py-4 md:py-5 bg-[#EBA914] hover:bg-amber-500 rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition-transform hover:-translate-y-1">
-                  <span className="text-white text-base md:text-lg font-black uppercase tracking-wider">{dict.home.pesquisar}</span>
-                </button>
+                <input 
+                  type="text" 
+                  name="q" 
+                  placeholder={isEn ? "What are you looking for? (e.g. Tennis in Porto, Surf...)" : "O que procura? (ex: Ténis no Porto, Surf na Caparica...)"} 
+                  className="w-full pl-12 pr-4 py-4 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-base font-medium outline-none focus:border-emerald-500 focus:bg-white transition-all placeholder:text-slate-400 shadow-sm"
+                />
               </div>
 
-              {/* DIVIDER */}
-              <div className="flex items-center gap-4 w-full px-2">
-                <div className="h-px bg-slate-200 flex-1"></div>
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">{isEn ? 'Advanced Filters' : 'Busca Avançada'}</span>
-                <div className="h-px bg-slate-200 flex-1"></div>
-              </div>
-
-              {/* 4 DROPDOWNS CLÁSSICOS */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 w-full">
-                <div className="relative">
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">{isEn ? 'Country' : 'País'}</label>
-                  <select name="pais" className="w-full appearance-none rounded-xl bg-white px-4 py-3 text-slate-700 text-sm font-bold outline-none border border-slate-200 focus:border-emerald-500 cursor-pointer shadow-sm">
+              {/* 4 DROPDOWNS CLÁSSICOS (Alinhados, sem divisórias) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 w-full pb-8 md:pb-0">
+                <div>
+                  <label className="block text-xs font-bold text-slate-900 mb-2">{isEn ? 'Country' : 'País'}</label>
+                  <select name="pais" className="w-full appearance-none rounded-xl bg-slate-50 px-4 py-3 text-slate-700 text-sm font-medium outline-none border border-slate-200 focus:border-emerald-500 cursor-pointer">
                     <option value="">{isEn ? 'All Countries' : 'Todos os Países'}</option>
                     {paisesOpcoes.map((p: any) => <option key={p.valor} value={p.valor}>{p.label}</option>)}
                   </select>
-                  <div className="pointer-events-none absolute right-4 top-[28px] text-slate-400 text-xs">▼</div>
                 </div>
 
-                <div className="relative">
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">{dict.home.distrito}</label>
-                  <select name="distrito" className="w-full appearance-none rounded-xl bg-white px-4 py-3 text-slate-700 text-sm font-bold outline-none border border-slate-200 focus:border-emerald-500 cursor-pointer shadow-sm">
+                <div>
+                  <label className="block text-xs font-bold text-slate-900 mb-2">{dict.home.distrito}</label>
+                  <select name="distrito" className="w-full appearance-none rounded-xl bg-slate-50 px-4 py-3 text-slate-700 text-sm font-medium outline-none border border-slate-200 focus:border-emerald-500 cursor-pointer">
                     <option value="">{dict.home.todos_distritos}</option>
                     {distritosOpcoes.map((d: any) => <option key={d.valor} value={d.valor}>{d.label}</option>)}
                   </select>
-                  <div className="pointer-events-none absolute right-4 top-[28px] text-slate-400 text-xs">▼</div>
                 </div>
 
-                <div className="relative">
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">{dict.home.categoria}</label>
-                  <select name="categoria" className="w-full appearance-none rounded-xl bg-white px-4 py-3 text-slate-700 text-sm font-bold outline-none border border-slate-200 focus:border-emerald-500 cursor-pointer shadow-sm">
+                <div>
+                  <label className="block text-xs font-bold text-slate-900 mb-2">{dict.home.categoria}</label>
+                  <select name="categoria" className="w-full appearance-none rounded-xl bg-slate-50 px-4 py-3 text-slate-700 text-sm font-medium outline-none border border-slate-200 focus:border-emerald-500 cursor-pointer">
                     <option value="">{dict.home.todas_categorias}</option>
                     {categoriasOpcoes.map((cat: any) => <option key={cat.valor} value={cat.valor}>{cat.label}</option>)}
                   </select>
-                  <div className="pointer-events-none absolute right-4 top-[28px] text-slate-400 text-xs">▼</div>
                 </div>
 
-                <div className="relative">
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">{dict.home.faixa_etaria}</label>
-                  <select name="idade" className="w-full appearance-none rounded-xl bg-white px-4 py-3 text-slate-700 text-sm font-bold outline-none border border-slate-200 focus:border-emerald-500 cursor-pointer shadow-sm">
+                <div>
+                  <label className="block text-xs font-bold text-slate-900 mb-2">{dict.home.faixa_etaria}</label>
+                  <select name="idade" className="w-full appearance-none rounded-xl bg-slate-50 px-4 py-3 text-slate-700 text-sm font-medium outline-none border border-slate-200 focus:border-emerald-500 cursor-pointer">
                     <option value="">{dict.home.todas_idades}</option>
                     {idadesOpcoes.map((faixa: any) => <option key={faixa.valor} value={faixa.valor}>{faixa.label}</option>)}
                   </select>
-                  <div className="pointer-events-none absolute right-4 top-[28px] text-slate-400 text-xs">▼</div>
                 </div>
+              </div>
+
+              {/* BOTÃO PESQUISAR - RESTAURADO O CÍRCULO FLUTUANTE ELEGANTE */}
+              <div className="flex justify-center mt-8 md:absolute md:-bottom-[4.5rem] md:left-1/2 md:-translate-x-1/2">
+                <button type="submit" className="group w-full md:w-24 md:h-24 bg-[#EBA914] hover:bg-amber-500 rounded-xl md:rounded-full flex flex-row md:flex-col items-center justify-center gap-2 py-4 shadow-lg shadow-amber-500/30 md:border-[6px] md:border-slate-50 transition-transform hover:scale-105 z-20 cursor-pointer">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                  <span className="text-white text-sm md:text-[10px] font-black uppercase tracking-wider">{dict.home.pesquisar}</span>
+                </button>
               </div>
 
             </form>
