@@ -98,16 +98,16 @@ export default async function Home({
 
           <div className="relative bg-white rounded-3xl shadow-xl shadow-slate-200/50 p-6 md:p-10 border border-slate-100 max-w-4xl mx-auto mb-8">
             
-            {/* BOTÃO VER MAPA - RESTAURADO À VERSÃO SUBTIL */}
+            {/* BOTÃO VER NO MAPA */}
             <div className="absolute top-5 right-5 z-20 hidden md:block">
               <Link href={`/${lang}/mapa`} className="inline-flex items-center gap-2 bg-emerald-50 text-emerald-700 px-4 py-2 rounded-full text-xs font-bold no-underline border border-emerald-100 hover:bg-emerald-100 transition-colors">
                 <span>📍</span> {dict.home.ver_mapa}
               </Link>
             </div>
 
-            <form action={`/${lang}/pesquisa`} method="GET" className="mt-8 md:mt-4 relative">
+            <form action={`/${lang}/pesquisa`} method="GET" className="mt-8 md:mt-4 relative pb-8 md:pb-0">
               
-              {/* NOVA BARRA DE TEXTO LIVRE - LIMPA E ELEGANTE */}
+              {/* 1. NOVA BARRA DE TEXTO LIVRE */}
               <div className="mb-6 relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                   <span className="text-slate-400 text-lg">🔍</span>
@@ -116,14 +116,21 @@ export default async function Home({
                   type="text" 
                   name="q" 
                   placeholder={isEn ? "What are you looking for? (e.g. Tennis in Porto, Surf...)" : "O que procura? (ex: Ténis no Porto, Surf na Caparica...)"} 
-                  className="w-full pl-12 pr-4 py-4 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-base font-medium outline-none focus:border-emerald-500 focus:bg-white transition-all placeholder:text-slate-400 shadow-sm"
+                  className="w-full pl-12 pr-4 py-4 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-base font-medium outline-none focus:border-emerald-500 focus:bg-white transition-all placeholder:text-slate-400"
                 />
               </div>
 
-              {/* 4 DROPDOWNS CLÁSSICOS (Alinhados, sem divisórias) */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 w-full pb-8 md:pb-0">
+              {/* 2. SEPARADOR ELEGANTE "BUSCA AVANÇADA" */}
+              <div className="flex items-center gap-4 w-full mb-6">
+                <div className="h-px bg-slate-100 flex-1"></div>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{isEn ? 'Advanced Search' : 'Busca Avançada'}</span>
+                <div className="h-px bg-slate-100 flex-1"></div>
+              </div>
+
+              {/* 3. 4 DROPDOWNS CLÁSSICOS (Original) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 w-full">
                 <div>
-                  <label className="block text-xs font-bold text-slate-900 mb-2">{isEn ? 'Country' : 'País'}</label>
+                  <label className="block text-[10px] font-bold text-slate-900 uppercase tracking-wider mb-2 ml-1">{isEn ? 'Country' : 'País'}</label>
                   <select name="pais" className="w-full appearance-none rounded-xl bg-slate-50 px-4 py-3 text-slate-700 text-sm font-medium outline-none border border-slate-200 focus:border-emerald-500 cursor-pointer">
                     <option value="">{isEn ? 'All Countries' : 'Todos os Países'}</option>
                     {paisesOpcoes.map((p: any) => <option key={p.valor} value={p.valor}>{p.label}</option>)}
@@ -131,7 +138,7 @@ export default async function Home({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-900 mb-2">{dict.home.distrito}</label>
+                  <label className="block text-[10px] font-bold text-slate-900 uppercase tracking-wider mb-2 ml-1">{dict.home.distrito}</label>
                   <select name="distrito" className="w-full appearance-none rounded-xl bg-slate-50 px-4 py-3 text-slate-700 text-sm font-medium outline-none border border-slate-200 focus:border-emerald-500 cursor-pointer">
                     <option value="">{dict.home.todos_distritos}</option>
                     {distritosOpcoes.map((d: any) => <option key={d.valor} value={d.valor}>{d.label}</option>)}
@@ -139,7 +146,7 @@ export default async function Home({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-900 mb-2">{dict.home.categoria}</label>
+                  <label className="block text-[10px] font-bold text-slate-900 uppercase tracking-wider mb-2 ml-1">{dict.home.categoria}</label>
                   <select name="categoria" className="w-full appearance-none rounded-xl bg-slate-50 px-4 py-3 text-slate-700 text-sm font-medium outline-none border border-slate-200 focus:border-emerald-500 cursor-pointer">
                     <option value="">{dict.home.todas_categorias}</option>
                     {categoriasOpcoes.map((cat: any) => <option key={cat.valor} value={cat.valor}>{cat.label}</option>)}
@@ -147,7 +154,7 @@ export default async function Home({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-900 mb-2">{dict.home.faixa_etaria}</label>
+                  <label className="block text-[10px] font-bold text-slate-900 uppercase tracking-wider mb-2 ml-1">{dict.home.faixa_etaria}</label>
                   <select name="idade" className="w-full appearance-none rounded-xl bg-slate-50 px-4 py-3 text-slate-700 text-sm font-medium outline-none border border-slate-200 focus:border-emerald-500 cursor-pointer">
                     <option value="">{dict.home.todas_idades}</option>
                     {idadesOpcoes.map((faixa: any) => <option key={faixa.valor} value={faixa.valor}>{faixa.label}</option>)}
@@ -155,7 +162,7 @@ export default async function Home({
                 </div>
               </div>
 
-              {/* BOTÃO PESQUISAR - RESTAURADO O CÍRCULO FLUTUANTE ELEGANTE */}
+              {/* 4. BOTÃO REDONDO AMARELO - MANTIDO EXATAMENTE IGUAL */}
               <div className="flex justify-center mt-8 md:absolute md:-bottom-[4.5rem] md:left-1/2 md:-translate-x-1/2">
                 <button type="submit" className="group w-full md:w-24 md:h-24 bg-[#EBA914] hover:bg-amber-500 rounded-xl md:rounded-full flex flex-row md:flex-col items-center justify-center gap-2 py-4 shadow-lg shadow-amber-500/30 md:border-[6px] md:border-slate-50 transition-transform hover:scale-105 z-20 cursor-pointer">
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
