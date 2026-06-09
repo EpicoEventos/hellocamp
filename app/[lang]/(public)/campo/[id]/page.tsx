@@ -25,8 +25,17 @@ export async function generateMetadata({ params }: { params: Promise<{ lang: str
   };
 }
 
-export default async function DetalhesDoCampo({ params }: { params: Promise<{ lang: string; id: string }> }) {
+export default async function DetalhesDoCampo({ 
+  params,
+  searchParams
+}: { 
+  params: Promise<{ lang: string; id: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}) {
   const { lang, id } = await params;
+  const sParams = await searchParams;
+  const showSuccessMessage = sParams?.sucesso_duvida === 'true';
+  
   const dict = await getDictionary(lang as "pt" | "en");
   const isEn = lang === 'en';
 
@@ -77,7 +86,6 @@ export default async function DetalhesDoCampo({ params }: { params: Promise<{ la
   const baseUrl = "https://www.hellocamp.pt";
   const campoUrlCompleto = `${baseUrl}/${lang}/campo/${campo.id}`;
 
-  // SCHEMA MARKUP AVANÇADO (EVENTO + REVIEWS) PARA RICH SNIPPETS NO GOOGLE
   const dataMaisCedo = campo.turnos && campo.turnos.length > 0 ? campo.turnos[0].data_inicio : "2026-07-01";
   
   const eventSchema = {
@@ -127,7 +135,6 @@ export default async function DetalhesDoCampo({ params }: { params: Promise<{ la
 
   return (
     <main className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-24">
-      {/* SCRIPTS INVISÍVEIS PARA SEO */}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(eventSchema) }} />
 
@@ -136,7 +143,6 @@ export default async function DetalhesDoCampo({ params }: { params: Promise<{ la
         <img src={campo.imagem} alt={nomeCampo} className="w-full h-full object-cover opacity-90" />
         <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-transparent"></div>
 
-        {/* BREADCRUMBS VISUAIS */}
         <div className="absolute top-6 left-6 z-30 hidden sm:block">
           <nav className="flex items-center gap-2 text-[10px] sm:text-xs font-bold text-slate-700 bg-white/95 backdrop-blur-sm px-5 py-2.5 rounded-full shadow-md border border-white/20 tracking-wider uppercase">
             <Link href={`/${lang}`} className="hover:text-emerald-600 transition-colors">{isEn ? 'Home' : 'Início'}</Link>
@@ -161,7 +167,7 @@ export default async function DetalhesDoCampo({ params }: { params: Promise<{ la
           
           <div className="flex-1 w-full flex flex-col gap-6">
             
-            {/* CABEÇALHO DO CAMPO (z-40 para isolamento de contexto do modal) */}
+            {/* CABEÇALHO DO CAMPO */}
             <div className="bg-white p-8 md:p-10 rounded-3xl shadow-sm border border-slate-100 relative z-40">
               <div className="absolute top-8 right-8 z-50 flex items-center gap-3">
                 <BotaoPartilha url={campoUrlCompleto} titulo={nomeCampo} isEn={isEn} />
@@ -194,7 +200,7 @@ export default async function DetalhesDoCampo({ params }: { params: Promise<{ la
               <p className="leading-relaxed text-slate-600 text-base whitespace-pre-wrap font-medium mb-0">{descCampo}</p>
               
               {campo.organizador_id && parceiroInfo && (
-                <Link href={`/${lang}/admin/${campo.organizador_id}`} className="mt-8 flex items-center justify-between p-4 bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 transition-colors no-underline group">
+                <Link href={`/${lang}/parceiro/${campo.organizador_id}`} className="mt-8 flex items-center justify-between p-4 bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 transition-colors no-underline group">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center overflow-hidden border border-slate-200 shadow-sm flex-shrink-0">
                       {parceiroInfo.logotipo_url ? (
@@ -321,52 +327,60 @@ export default async function DetalhesDoCampo({ params }: { params: Promise<{ la
               )}
             </div>
 
-            {/* FORMULÁRIO DE CONTACTO COMPLETO */}
-            <div className="bg-white p-8 md:p-10 rounded-3xl shadow-sm border border-slate-100 relative z-10">
+            {/* FORMULÁRIO DE CONTACTO (AGORA COM RESEND) */}
+            <div id="duvidas" className="bg-white p-8 md:p-10 rounded-3xl shadow-sm border border-slate-100 relative z-10 scroll-mt-24">
               <h3 className="text-xl font-bold text-slate-900 mb-2">{dict.detalhe.duvidas_titulo}</h3>
               <p className="text-sm text-slate-500 font-medium mb-8">{dict.detalhe.duvidas_sub}</p>
               
-              <form action="https://formsubmit.co/info@hellocamp.com" method="POST" className="flex flex-col gap-6">
-                <input type="hidden" name="_captcha" value="false" />
-                <input type="hidden" name="_subject" value={`${isEn ? 'Question regarding HelloCamp:' : 'Dúvida sobre o campo HelloCamp:'} ${nomeCampo}`} />
+              {showSuccessMessage ? (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-8 text-center animate-in fade-in zoom-in duration-300">
+                  <span className="text-5xl mb-4 block">✅</span>
+                  <h4 className="text-xl font-black text-emerald-800 mb-2">{isEn ? 'Message Sent Successfully!' : 'Mensagem Enviada com Sucesso!'}</h4>
+                  <p className="text-emerald-700 font-medium">{isEn ? 'Our team will review your question and get back to you shortly.' : 'A nossa equipa ou o organizador irá analisar a sua dúvida e responder brevemente.'}</p>
+                </div>
+              ) : (
+                <form action="/api/enviar-duvida" method="POST" className="flex flex-col gap-6">
+                  <input type="hidden" name="_subject" value={`${isEn ? 'Question regarding HelloCamp:' : 'Dúvida sobre o campo HelloCamp:'} ${nomeCampo}`} />
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <div className="flex flex-col gap-2">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">{dict.detalhe.nome}</label>
-                    <input type="text" name={isEn ? 'First_Name' : 'Nome'} required className="p-3.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-900 outline-none focus:border-slate-400" />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div className="flex flex-col gap-2">
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">{dict.detalhe.nome}</label>
+                      <input type="text" name="First_Name" required className="p-3.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-900 outline-none focus:border-emerald-500 transition-colors" />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">{dict.detalhe.apelido}</label>
+                      <input type="text" name="Last_Name" required className="p-3.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-900 outline-none focus:border-emerald-500 transition-colors" />
+                    </div>
                   </div>
-                  <div className="flex flex-col gap-2">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">{dict.detalhe.apelido}</label>
-                    <input type="text" name={isEn ? 'Last_Name' : 'Apelido'} required className="p-3.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-900 outline-none focus:border-slate-400" />
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div className="flex flex-col gap-2">
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">{dict.detalhe.email_encarregado}</label>
+                      <input type="email" name="Email" required className="p-3.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-900 outline-none focus:border-emerald-500 transition-colors" />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">{dict.detalhe.contacto_telefonico}</label>
+                      <input type="tel" name="Phone" required className="p-3.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-900 outline-none focus:border-emerald-500 transition-colors" />
+                    </div>
                   </div>
-                </div>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <div className="flex flex-col gap-2">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">{dict.detalhe.email_encarregado}</label>
-                    <input type="email" name="Email" required className="p-3.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-900 outline-none focus:border-slate-400" />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">{dict.detalhe.contacto_telefonico}</label>
-                    <input type="tel" name={isEn ? 'Phone' : 'Telefone'} required className="p-3.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-900 outline-none focus:border-slate-400" />
-                  </div>
-                </div>
 
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">{dict.detalhe.idade_participante}</label>
-                  <input type="number" name={isEn ? 'Age' : 'Idade'} min="1" required className="p-3.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-900 outline-none focus:border-slate-400" />
-                </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">{dict.detalhe.idade_participante}</label>
+                    <input type="number" name="Age" min="1" required className="p-3.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-900 outline-none focus:border-emerald-500 transition-colors" />
+                  </div>
 
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">{dict.detalhe.mensagem}</label>
-                  <textarea name={isEn ? 'Message' : 'Mensagem'} rows={4} required className="p-3.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-900 outline-none focus:border-slate-400 resize-none"></textarea>
-                </div>
-                
-                <button type="submit" className="self-start px-8 py-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm transition-colors shadow-sm">
-                  {dict.detalhe.enviar_mensagem}
-                </button>
-              </form>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">{dict.detalhe.mensagem}</label>
+                    <textarea name="Message" rows={4} required className="p-3.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-900 outline-none focus:border-emerald-500 transition-colors resize-none"></textarea>
+                  </div>
+                  
+                  <button type="submit" className="self-start px-8 py-3.5 rounded-xl bg-slate-900 hover:bg-emerald-600 text-white font-bold text-sm transition-colors shadow-sm">
+                    {dict.detalhe.enviar_mensagem}
+                  </button>
+                </form>
+              )}
             </div>
+
           </div>
 
           {/* SIDEBAR COM CAIXA DE RESERVA */}
