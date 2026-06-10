@@ -174,7 +174,7 @@ export default function PaginaPesquisa({
             </p>
             {/* CORREÇÃO DO BOTÃO AQUI */}
             <Link href={`/${lang}/pesquisa`} className="mt-2 text-emerald-600 font-bold hover:text-emerald-700 transition-colors">
-              {isEn ? 'Clear filters and try again &rarr;' : 'Limpar filtros e tentar de novo &rarr;'}
+              {isEn ? 'Clear filters and try again;' : 'Limpar filtros e tentar de novo'}
             </Link>
           </div>
         ) : (
