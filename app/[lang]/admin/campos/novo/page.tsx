@@ -91,6 +91,7 @@ export default function NovoCampo({ params }: { params: Promise<{ lang: string }
     racio_monitores: "", duracao_dias: 7,
     alimentacao: "Não tem", alojamento: "Não tem", seguro: "Incluído no Preço",
     politica_cancelamento: "Moderada (Reembolso a 50% até 15 dias antes)",
+    tipo_pagamento: "100_total", // <--- Adicionado para controlar a estratégia de tesouraria
     descricao: "", regras_termos: "",
     extra_alimentacao: 0, tipo_cobranca_alimentacao: "Por Turno",
     extra_alojamento: 0, tipo_cobranca_alojamento: "Por Turno",
@@ -263,7 +264,6 @@ export default function NovoCampo({ params }: { params: Promise<{ lang: string }
       const textoDatas = turnos.map(t => `${formatarDataStr(t.data_inicio)} a ${formatarDataStr(t.data_fim)}`).join(", ");
       const totalVagasCalculado = turnos.reduce((acc, curr) => acc + (Number(curr.vagas) || 0), 0);
 
-      // INSERÇÃO IMEDIATA (Otimização: Inicializa campos EN vazios ou cópias simples)
       const { data: novoCampoInserido, error: insertError } = await supabase.from("campos").insert([{
         ...formData,
         idade: stringIdadesCompleta,
@@ -285,14 +285,12 @@ export default function NovoCampo({ params }: { params: Promise<{ lang: string }
 
       if (insertError) throw insertError;
 
-      // DISPARO DA TRADUÇÃO EM SEGUNDO PLANO (Não-bloqueante / Fire and Forget)
       fetch(`/api/translate-camp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: novoCampoInserido.id })
       }).catch(err => console.error("Erro assíncrono de tradução:", err));
 
-      // Redirecionamento instantâneo do utilizador
       router.push(`/${lang}/admin/campos`);
     } catch (error: any) { 
       alert("Erro: " + error.message); 
@@ -453,6 +451,18 @@ export default function NovoCampo({ params }: { params: Promise<{ lang: string }
         {/* 4. CONDIÇÕES E DOCUMENTOS */}
         <div style={sectionStyle}>
           <h2 style={sectionTitleStyle}>{isEn ? '4. Program & Conditions' : '4. Programa e Condições'}</h2>
+          
+          <div style={{ gridColumn: '1 / -1', backgroundColor: '#eff6ff', padding: '1.5rem', borderRadius: '1rem', border: '1px solid #bfdbfe', marginBottom: '2rem' }}>
+            <label style={{...labelStyle, color: '#1e3a8a'}}>{isEn ? 'Payment Rule for Parents' : 'Condição de Pagamento Exigida (Aos Pais)'}</label>
+            <p style={{ fontSize: '13px', color: '#1e40af', marginBottom: '1rem', marginTop: '-0.25rem' }}>
+              Pode facilitar a vida aos pais exigindo apenas um sinal de 50% para reservar a vaga. O resto do valor será pago 1 semana antes.
+            </p>
+            <select required value={formData.tipo_pagamento} onChange={e => setFormData({...formData, tipo_pagamento: e.target.value})} style={{...selectStyle, width: '100%', borderColor: '#93c5fd'}}>
+              <option value="100_total">{isEn ? '100% Upfront at Booking' : '100% Pago no Ato da Reserva (Tradicional)'}</option>
+              <option value="50_sinal">{isEn ? '50% Deposit Now + 50% Later' : 'Sinal de 50% Agora + 50% 1 Semana Antes'}</option>
+            </select>
+          </div>
+
           <div style={gridStyle}>
             <div>
               <label style={labelStyle}>{isEn ? 'Food' : 'Alimentação'}</label>

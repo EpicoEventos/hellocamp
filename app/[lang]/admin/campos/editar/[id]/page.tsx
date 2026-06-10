@@ -98,6 +98,7 @@ export default function EditarCampo({ params }: { params: Promise<{ lang: string
     nome: "", categoria: "", local: "", Distrito: "", racio_monitores: "", duracao_dias: 7,
     alimentacao: "Não tem", alojamento: "Não tem", seguro: "Incluído no Preço", 
     politica_cancelamento: "Moderada (Reembolso a 50% até 15 dias antes)",
+    tipo_pagamento: "100_total", // <--- GESTÃO DE TESOURARIA ADICIONADA AQUI
     descricao: "", regras_termos: "",
     extra_alimentacao: 0, tipo_cobranca_alimentacao: "Por Turno", extra_alojamento: 0, tipo_cobranca_alojamento: "Por Turno",
     extra_prolongamento: 0, tipo_cobranca_prolongamento: "Por Turno", extra_transporte: 0, tipo_cobranca_transporte: "Por Turno",
@@ -117,6 +118,7 @@ export default function EditarCampo({ params }: { params: Promise<{ lang: string
           ...data,
           contrato_parceiro_url: data.contrato_parceiro_url || "",
           politica_cancelamento: data.politica_cancelamento || "Moderada (Reembolso a 50% até 15 dias antes)",
+          tipo_pagamento: data.tipo_pagamento || "100_total", // Previne null values do DB
           imagem: data.imagem || "",
           galeria: data.galeria || []
         });
@@ -294,7 +296,9 @@ export default function EditarCampo({ params }: { params: Promise<{ lang: string
       const { error } = await supabase.from("campos").update({
         nome: formData.nome, categoria: formData.categoria, idade: stringIdadesCompleta, local: formData.local, Distrito: formData.Distrito,
         vagas_totais: totalVagasCalculado, racio_monitores: formData.racio_monitores, duracao_dias: formData.duracao_dias,
-        alimentacao: formData.alimentacao, alojamento: formData.alojamento, seguro: formData.seguro, politica_cancelamento: formData.politica_cancelamento,
+        alimentacao: formData.alimentacao, alojamento: formData.alojamento, seguro: formData.seguro, 
+        politica_cancelamento: formData.politica_cancelamento,
+        tipo_pagamento: formData.tipo_pagamento, // GRAVA A OPÇÃO DE TESOURARIA
         descricao: formData.descricao, regras_termos: formData.regras_termos,
         extra_alimentacao: formData.extra_alimentacao, extra_alojamento: formData.extra_alojamento,
         extra_prolongamento: formData.extra_prolongamento, extra_transporte: formData.extra_transporte,
@@ -331,7 +335,7 @@ export default function EditarCampo({ params }: { params: Promise<{ lang: string
     setAutoSaveStatus('pending');
     const timer = setTimeout(() => { handleUpdate(undefined, true); }, 5000);
     return () => clearTimeout(timer);
-  }, [formData.nome, formData.categoria, formData.local, formData.Distrito, formData.descricao, formData.regras_termos, turnos, linguas, faixasSelecionadas, mapPreview, pais, idadeManual, perguntasCustomizadas]);
+  }, [formData.nome, formData.categoria, formData.local, formData.Distrito, formData.descricao, formData.regras_termos, turnos, linguas, faixasSelecionadas, mapPreview, pais, idadeManual, perguntasCustomizadas, formData.tipo_pagamento]);
 
   if (loading) return <div style={{ padding: '4rem', textAlign: 'center' }}>{isEn ? 'Loading...' : 'A carregar dados do campo...'}</div>;
 
@@ -477,6 +481,19 @@ export default function EditarCampo({ params }: { params: Promise<{ lang: string
         {/* 4. CONDIÇÕES E DOCUMENTOS */}
         <div style={sectionStyle}>
           <h2 style={sectionTitleStyle}>4. Programa e Condições</h2>
+          
+          {/* MÓDULO DE TESOURARIA E OPÇÕES DE PAGAMENTO PARA OS PAIS */}
+          <div style={{ gridColumn: '1 / -1', backgroundColor: '#eff6ff', padding: '1.5rem', borderRadius: '1rem', border: '1px solid #bfdbfe', marginBottom: '2rem' }}>
+            <label style={{...labelStyle, color: '#1e3a8a'}}>Condição de Pagamento Exigida (Aos Pais)</label>
+            <p style={{ fontSize: '13px', color: '#1e40af', marginBottom: '1rem', marginTop: '-0.25rem' }}>
+              Pode facilitar a vida aos pais exigindo apenas um sinal de 50% para reservar a vaga. O resto do valor será pago 1 semana antes.
+            </p>
+            <select required value={formData.tipo_pagamento} onChange={e => setFormData({...formData, tipo_pagamento: e.target.value})} style={{...selectStyle, width: '100%', borderColor: '#93c5fd'}}>
+              <option value="100_total">100% Pago no Ato da Reserva (Tradicional)</option>
+              <option value="50_sinal">Sinal de 50% Agora + 50% 1 Semana Antes</option>
+            </select>
+          </div>
+
           <div style={gridStyle}>
             <div>
               <label style={labelStyle}>Alimentação</label>
