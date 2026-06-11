@@ -4,19 +4,27 @@ import { useEffect, useState, use } from "react";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import React from "react";
-import SugestoesMagicas from "../../components/SugestoesMagicas";
 
 export default function DashboardCliente({ params }: { params: Promise<{ lang: string }> }) {
   const { lang } = use(params);
   const isEn = lang === 'en';
 
-  const [reservas, setReservas] = useState<any[]>([]);
-  const [wishlists, setWishlists] = useState<any[]>([]);
-  const [primeiraCriancaId, setPrimeiraCriancaId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingStripe, setLoadingStripe] = useState<string | null>(null);
 
-  // Estados para o Modal de Partilha (Lightbox Airbnb style)
+  // Dados do Pai e Avisos
+  const [perfilPai, setPerfilPai] = useState<any>(null);
+  const [dadosEmFalta, setDadosEmFalta] = useState<string[]>([]);
+
+  // Listas de Dados Planos
+  const [reservas, setReservas] = useState<any[]>([]);
+  const [wishlists, setWishlists] = useState<any[]>([]);
+  const [sugestoesVerdes, setSugestoesVerdes] = useState<any[]>([]);
+
+  // Estado para o Modal Detalhado da Reserva (Substitui o redirecionamento)
+  const [reservaModal, setReservaModal] = useState<any>(null);
+
+  // Estados para o Modal de Partilha (Lightbox)
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState("");
   const [shareTitle, setShareTitle] = useState("");
@@ -27,46 +35,59 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      // 1. Buscar Reservas usando cliente_id
-      const { data: reservasData } = await supabase
-        .from('reservas')
-        .select(`*, campos ( id, nome, nome_en, imagem, local, local_en, organizador_id ), criancas ( nome )`)
-        .eq('cliente_id', session.user.id) 
-        .order('created_at', { ascending: false });
-      setReservas(reservasData || []);
+      const userId = session.user.id;
 
-      // 2. Buscar Wishlists e contar os campos
-      const { data: wishData } = await supabase
-        .from('wishlists')
-        .select(`id, nome, token_partilha, wishlist_campos(count)`)
-        .eq('user_id', session.user.id)
-        .order('created_at', { ascending: false });
-      setWishlists(wishData || []);
+      // 1. Busca Plana e Segura
+      const { data: perfilData } = await supabase.from('perfis').select('*').eq('id', userId).single();
+      const { data: reservasData } = await supabase.from('reservas').select('*').eq('cliente_id', userId).order('created_at', { ascending: false });
+      const { data: camposData } = await supabase.from('campos').select('id, nome, nome_en, imagem, local, local_en, organizador_id, preco');
+      const { data: criancasData } = await supabase.from('criancas').select('*').eq('cliente_id', userId);
+      const { data: wishData } = await supabase.from('wishlists').select('id, nome, token_partilha').eq('user_id', userId).order('created_at', { ascending: false });
 
-      // 3. Buscar uma Criança para as Sugestões Mágicas
-      const { data: criancasData } = await supabase.from('criancas').select('id').eq('cliente_id', session.user.id).limit(1);
-      if (criancasData && criancasData.length > 0) {
-        setPrimeiraCriancaId(criancasData[0].id);
+      // Verificação de Dados Importantes em Falta no Perfil do Pai
+      if (perfilData) {
+        setPerfilPai(perfilData);
+        const faltas = [];
+        if (!perfilData.nome_completo) faltas.push(isEn ? 'Full Name' : 'Nome do Encarregado de Educação');
+        if (!perfilData.nif) faltas.push('NIF (Para Faturação)');
+        if (!perfilData.telefone) faltas.push(isEn ? 'Phone Number' : 'Número de Telemóvel');
+        if (!perfilData.contacto_emergencia) faltas.push(isEn ? 'Emergency Contact' : 'Contacto de Emergência Alternativo');
+        setDadosEmFalta(faltas);
       }
 
+      // Cruzamento Seguro de Reservas
+      const camposCompradosIds: string[] = [];
+      if (reservasData) {
+        const reservasCruzadas = reservasData.map(res => {
+          const campo = camposData?.find(c => c.id === res.campo_id) || {};
+          const crianca = criancasData?.find(cr => cr.id === res.crianca_id) || {};
+          camposCompradosIds.push(res.campo_id);
+
+          return { ...res, campos: campo, criancas: crianca };
+        });
+        setReservas(reservasCruzadas);
+      }
+
+      // Gerar Sugestões Limpas e Verdes (Excluindo o que já comprou)
+      if (camposData) {
+        const recomendacoes = camposData
+          .filter(c => !camposCompradosIds.includes(c.id))
+          .slice(0, 3); // Apenas 3 sugestões
+        setSugestoesVerdes(recomendacoes);
+      }
+
+      setWishlists(wishData || []);
       setLoading(false);
     };
 
     fetchData();
-  }, [lang]);
+  }, [lang, isEn]);
 
-  // Função para pagar a segunda parcela
   const handlePagarRestante = async (reserva: any) => {
     setLoadingStripe(reserva.id);
-    
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      
-      const { data: orgData } = await supabase
-        .from('perfis')
-        .select('stripe_account_id')
-        .eq('id', reserva.campos.organizador_id)
-        .single();
+      const { data: orgData } = await supabase.from('perfis').select('stripe_account_id').eq('id', reserva.campos.organizador_id).single();
 
       const res = await fetch('/api/stripe-checkout', {
         method: 'POST',
@@ -82,7 +103,7 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
         })
       });
 
-      if (!res.ok) throw new Error("Erro de servidor ao processar pagamento.");
+      if (!res.ok) throw new Error("Erro no processamento.");
       const data = await res.json();
       if (data.url) window.location.href = data.url;
     } catch (err: any) {
@@ -93,38 +114,74 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
 
   const abrirModalPartilha = (token: string, nomeLista: string) => {
     const url = `${window.location.origin}/${lang}/lista/${token}`;
-    setShareUrl(url);
-    setShareTitle(nomeLista);
-    setCopied(false);
-    setIsShareModalOpen(true);
+    setShareUrl(url); setShareTitle(nomeLista); setCopied(false); setIsShareModalOpen(true);
   };
 
   const handleCopyLink = async () => {
     try {
       await navigator.clipboard.writeText(shareUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error("Failed to copy!", err);
-    }
+      setCopied(true); setTimeout(() => setCopied(false), 2000);
+    } catch (err) {}
   };
 
-  if (loading) return <div className="p-12 text-center text-slate-500 font-bold">{isEn ? 'Loading your dashboard...' : 'A carregar o seu resumo...'}</div>;
+  if (loading) return <div className="p-12 text-center text-slate-500 font-bold">{isEn ? 'Loading your dashboard...' : 'A organizar a sua área pessoal...'}</div>;
 
   return (
-    <div className="max-w-[1000px] mx-auto p-4 font-sans relative">
+    <div className="max-w-[1000px] mx-auto p-4 font-sans relative pb-20">
       
-      <div className="mb-10">
+      {/* CABEÇALHO */}
+      <div className="mb-8">
         <h1 className="text-4xl font-black text-slate-900 m-0 tracking-tight">
           {isEn ? 'Upcoming Camps' : 'Próximos Campos'}
         </h1>
         <p className="text-slate-500 mt-2 text-base font-medium">
-          {isEn ? 'View your active programs and child schedules.' : 'Consulte os programas ativos e as inscrições dos seus filhos.'}
+          {isEn ? 'View your active programs and child schedules.' : 'Acompanhe as inscrições e a logística das próximas férias.'}
         </p>
       </div>
 
-      {primeiraCriancaId && (
-        <SugestoesMagicas criancaId={primeiraCriancaId} lang={lang} />
+      {/* ALERTA DE DADOS EM FALTA NO PERFIL */}
+      {dadosEmFalta.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 mb-10 shadow-sm">
+          <div className="flex items-start gap-4">
+            <div className="text-amber-500 text-2xl mt-1">⚠️</div>
+            <div>
+              <h3 className="text-amber-800 font-bold text-lg mb-1">{isEn ? 'Missing Important Information' : 'Dados do Encarregado Incompletos'}</h3>
+              <p className="text-amber-700 text-sm mb-3">
+                {isEn ? 'To ensure safety and proper invoicing, please add the following data to your profile:' : 'Para garantir o contacto do organizador em caso de emergência e a emissão correta da sua fatura, preencha os seguintes dados:'}
+              </p>
+              <ul className="list-disc pl-5 text-amber-700 text-sm font-semibold mb-4">
+                {dadosEmFalta.map((falta, idx) => <li key={idx}>{falta}</li>)}
+              </ul>
+              <Link href={`/${lang}/perfil`} className="inline-block bg-amber-600 hover:bg-amber-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm transition-colors shadow-sm">
+                {isEn ? 'Complete Profile Now' : 'Completar Perfil Agora'}
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MÓDULO DE SUGESTÕES LIMPO (Verde Escuro) */}
+      {sugestoesVerdes.length > 0 && (
+        <div className="bg-emerald-50 border border-emerald-100 rounded-3xl p-8 mb-12 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-100 rounded-full blur-3xl opacity-50 -mr-20 -mt-20"></div>
+          
+          <h2 className="text-2xl font-black text-emerald-900 mb-2 relative z-10">{isEn ? 'Suggested for You' : 'Sugestões de Verão'}</h2>
+          <p className="text-emerald-700 font-medium text-sm mb-6 relative z-10 max-w-xl">
+            {isEn ? 'Explore these highly-rated programs that you haven\'t booked yet.' : 'Explore estes programas altamente recomendados. Excluímos automaticamente as suas reservas atuais.'}
+          </p>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 relative z-10">
+            {sugestoesVerdes.map(sug => (
+              <Link key={sug.id} href={`/${lang}/campo/${sug.id}`} className="bg-white rounded-2xl p-3 border border-emerald-100 hover:border-emerald-300 hover:shadow-md transition-all group flex items-center gap-3">
+                <img src={sug.imagem || 'https://images.unsplash.com/photo-1502680390469-be75c86b636f?q=80&w=200'} alt={sug.nome} className="w-12 h-12 rounded-xl object-cover" />
+                <div>
+                  <h4 className="font-bold text-slate-900 text-sm leading-tight group-hover:text-emerald-600 transition-colors">{isEn && sug.nome_en ? sug.nome_en : sug.nome}</h4>
+                  <p className="text-xs text-slate-500 mt-1">{isEn && sug.local_en ? sug.local_en : sug.local}</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* SECÇÃO 1: RESERVAS */}
@@ -144,48 +201,69 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
             const nomeCampo = isEn && campo?.nome_en ? campo.nome_en : campo?.nome;
             const localCampo = isEn && campo?.local_en ? campo.local_en : campo?.local;
             
-            const isSinalPago = reserva.status_pagamento === 'Sinal Pago';
-            const isPago = reserva.status_pagamento === 'Pago';
-            const valorPago = Number(reserva.valor_pago) || (isPago ? reserva.valor_total : 0);
+            const isReembolsada = reserva.status_pagamento === 'Reembolsado' || reserva.status_reembolso === 'Reembolsado';
+            const isSinalPago = !isReembolsada && reserva.status_pagamento === 'Sinal Pago';
+            const isPago = !isReembolsada && reserva.status_pagamento === 'Pago';
+            const isPendente = !isReembolsada && !isSinalPago && !isPago;
+            
             const valorFalta = Number(reserva.valor_em_falta) || 0;
 
             return (
-              <div key={reserva.id} className="group flex flex-col bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm relative">
-                <Link href={`/${lang}/campo/${campo?.id}`} className="absolute inset-0 z-0"><span className="sr-only">Ver Campo</span></Link>
+              <div key={reserva.id} className="group flex flex-col bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm relative transition-all duration-300 hover:shadow-xl">
                 
-                <div className="h-48 w-full relative overflow-hidden bg-slate-100 z-10 pointer-events-none">
+                {/* BOTÃO QUE ABRE O MODAL EM VEZ DE MUDAR DE PÁGINA */}
+                <button 
+                  onClick={() => setReservaModal(reserva)} 
+                  className="absolute inset-0 z-10 w-full h-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-inset"
+                  aria-label={isEn ? 'View Booking Details' : 'Ver Detalhes da Inscrição'}
+                />
+                
+                <div className={`h-48 w-full relative overflow-hidden bg-slate-100 ${isReembolsada ? 'grayscale' : ''}`}>
                   <img src={campo?.imagem || 'https://images.unsplash.com/photo-1502680390469-be75c86b636f?q=80&w=600'} alt={nomeCampo} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
                   <div className="absolute top-4 right-4 bg-slate-900/80 backdrop-blur-sm px-3 py-1.5 rounded-full text-white text-[10px] font-black tracking-widest uppercase shadow-sm">
                     {reserva.turno_nome || 'Turno'}
                   </div>
+                  {isReembolsada && (
+                    <div className="absolute inset-0 bg-red-900/40 flex items-center justify-center">
+                      <span className="bg-red-600 text-white font-black uppercase tracking-widest px-4 py-2 rounded-xl text-sm transform -rotate-12 shadow-lg border-2 border-red-400">
+                        {isEn ? 'Cancelled' : 'Cancelada'}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
-                <div className="p-6 flex flex-col flex-1 z-10 pointer-events-none">
-                  <h3 className="text-xl font-black text-slate-900 m-0 leading-tight">{nomeCampo}</h3>
-                  <p className="text-sm font-bold text-slate-500 mt-2 mb-6">📍 {localCampo}</p>
+                <div className={`p-6 flex flex-col flex-1 relative z-20 ${isReembolsada ? 'opacity-60' : ''}`}>
+                  <h3 className="text-xl font-black text-slate-900 m-0 leading-tight group-hover:text-emerald-700 transition-colors pointer-events-none">{nomeCampo}</h3>
+                  <p className="text-sm font-bold text-slate-500 mt-2 mb-6 pointer-events-none">📍 {localCampo}</p>
                   
-                  <div className="border-t border-slate-100 pt-5 mt-auto flex justify-between items-end mb-4">
+                  <div className="border-t border-slate-100 pt-5 mt-auto flex justify-between items-end mb-4 pointer-events-none">
                     <div>
                       <span className="block text-[10px] text-slate-400 font-black uppercase tracking-widest mb-1">{isEn ? 'PARTICIPANT' : 'PARTICIPANTE'}</span>
-                      <span className="text-sm font-bold text-slate-700">👦 {reserva.criancas?.nome}</span>
+                      <span className="text-sm font-bold text-slate-700">👦 {reserva.criancas?.nome || 'N/D'}</span>
                     </div>
                     <div className="text-right">
                       <span className="block text-[10px] text-slate-400 font-black uppercase tracking-widest mb-1">TOTAL</span>
-                      <span className="text-lg font-black text-emerald-600 leading-none">{reserva.valor_total}€</span>
+                      <span className={`text-lg font-black leading-none ${isReembolsada ? 'text-slate-400 line-through' : 'text-emerald-600'}`}>
+                        {reserva.valor_total}€
+                      </span>
                     </div>
                   </div>
                 </div>
 
-                {/* PAINEL FINANCEIRO DE AÇÃO NO DASHBOARD */}
-                <div className="px-6 pb-6 z-20">
-                  {isSinalPago && valorFalta > 0 ? (
+                {/* PAINEL FINANCEIRO DE AÇÃO NO DASHBOARD (Aumenta o z-index para ser clicável) */}
+                <div className="px-6 pb-6 relative z-30">
+                  {isReembolsada ? (
+                    <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-center">
+                      <span className="text-xs font-black uppercase tracking-widest text-red-600">❌ Inscrição e Pagamento Anulados</span>
+                    </div>
+                  ) : isSinalPago && valorFalta > 0 ? (
                     <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center justify-between shadow-inner">
                       <div>
                         <p className="text-[10px] font-black uppercase tracking-widest text-amber-700 m-0">Falta Pagar</p>
                         <p className="text-lg font-black text-amber-600 m-0">{valorFalta.toFixed(2)}€</p>
                       </div>
                       <button 
-                        onClick={() => handlePagarRestante(reserva)}
+                        onClick={(e) => { e.stopPropagation(); handlePagarRestante(reserva); }}
                         disabled={loadingStripe === reserva.id}
                         className="bg-amber-600 text-white font-bold text-sm px-4 py-2.5 rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50 shadow-sm"
                       >
@@ -196,13 +274,12 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
                     <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 text-center">
                       <span className="text-xs font-black uppercase tracking-widest text-emerald-600">✓ Vaga Confirmada (100% Pago)</span>
                     </div>
-                  ) : (
+                  ) : isPendente ? (
                     <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center">
-                      <span className="text-xs font-black uppercase tracking-widest text-slate-500">⏳ Pagamento Pendente</span>
+                      <span className="text-xs font-black uppercase tracking-widest text-slate-500">⏳ A aguardar pagamento / Abandono</span>
                     </div>
-                  )}
+                  ) : null}
                 </div>
-
               </div>
             );
           })}
@@ -218,13 +295,10 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             {wishlists.map((lista) => {
-              const totalCampos = lista.wishlist_campos?.[0]?.count || 0;
-              
               return (
                 <div key={lista.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between h-40 relative group">
                   <div>
                     <h3 className="font-black text-slate-900 text-lg mb-1">{lista.nome}</h3>
-                    <p className="text-sm font-bold text-slate-500">{totalCampos} {isEn ? 'saved camps' : 'campos guardados'}</p>
                   </div>
                   
                   <div className="flex justify-between items-center mt-4">
@@ -247,103 +321,134 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
         )}
       </div>
 
-      {/* MODAL DE PARTILHA (LIGHTBOX ESTILO AIRBNB) */}
-      {isShareModalOpen && (
-        <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-opacity"
-          onClick={() => setIsShareModalOpen(false)}
-        >
-          <div 
-            className="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col transform transition-transform" 
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="font-black text-slate-900 text-xl">{isEn ? 'Share this list' : 'Partilhar esta lista'}</h3>
-              <button 
-                onClick={() => setIsShareModalOpen(false)} 
-                className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-900 transition-colors"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      {/* MODAL DETALHADO DA RESERVA */}
+      {reservaModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm transition-opacity" onClick={() => setReservaModal(null)}>
+          <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
+            
+            {/* Header Modal */}
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+              <div>
+                <h3 className="font-black text-slate-900 text-xl m-0">{isEn ? 'Booking Summary' : 'Resumo da Inscrição'}</h3>
+                <p className="text-xs text-slate-500 font-mono mt-1 mb-0">Ref: {reservaModal.id}</p>
+              </div>
+              <button onClick={() => setReservaModal(null)} className="w-10 h-10 flex items-center justify-center rounded-full bg-white border border-slate-200 text-slate-500 hover:bg-slate-900 hover:text-white transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
               </button>
             </div>
             
-            <div className="px-6 pt-6 pb-2">
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 text-2xl border border-emerald-100">
-                  🏕️
-                </div>
+            {/* Corpo Modal */}
+            <div className="p-6 overflow-y-auto bg-white flex flex-col gap-8">
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Coluna 1: O Programa */}
                 <div>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">HelloCamp Wishlist</p>
-                  <p className="text-base font-black text-slate-900 leading-tight">{shareTitle}</p>
+                  <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4">{isEn ? 'Program Details' : 'O Programa'}</h4>
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                    <p className="text-lg font-black text-slate-900 mb-1 leading-tight">{isEn && reservaModal.campos?.nome_en ? reservaModal.campos?.nome_en : reservaModal.campos?.nome}</p>
+                    <p className="text-sm font-bold text-slate-500 mb-4">📍 {isEn && reservaModal.campos?.local_en ? reservaModal.campos?.local_en : reservaModal.campos?.local}</p>
+                    
+                    <div className="border-t border-slate-200 pt-3">
+                      <p className="text-xs font-bold text-slate-500 uppercase mb-1">{isEn ? 'Shift/Dates' : 'Turno Selecionado'}</p>
+                      <p className="text-sm font-bold text-slate-900">{reservaModal.turno_nome}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Coluna 2: O Participante */}
+                <div>
+                  <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4">{isEn ? 'Participant Info' : 'O Participante'}</h4>
+                  <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-xl shadow-sm">👦</div>
+                      <div>
+                        <p className="text-base font-black text-emerald-950 leading-none mb-1">{reservaModal.criancas?.nome || 'N/D'}</p>
+                        <p className="text-xs font-bold text-emerald-700">NIF: {reservaModal.criancas?.nif || 'Não preenchido'}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-2 text-sm border-t border-emerald-200/50 pt-3">
+                      <div>
+                        <span className="block text-[10px] font-bold text-emerald-600/70 uppercase">{isEn ? 'Allergies' : 'Alergias'}</span>
+                        <span className="font-bold text-emerald-900">{reservaModal.criancas?.restricoes_alimentares || 'Nenhuma'}</span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-emerald-600/70 uppercase">{isEn ? 'Chronic Diseases' : 'Doenças Crónicas'}</span>
+                        <span className="font-bold text-emerald-900">{reservaModal.criancas?.doencas_cronicas || 'Não'}</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <button 
-                onClick={handleCopyLink}
-                className="flex items-center gap-3 p-4 rounded-xl border border-slate-200 hover:border-slate-900 transition-colors group text-left"
-              >
-                <div className="text-slate-700 group-hover:text-slate-900">
-                  {copied ? (
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                  ) : (
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                  )}
-                </div>
-                <span className={`text-sm font-bold ${copied ? 'text-emerald-600' : 'text-slate-800'}`}>
-                  {copied ? (isEn ? 'Copied!' : 'Copiado!') : (isEn ? 'Copy link' : 'Copiar ligação')}
-                </span>
-              </button>
+              {/* Extras e Formulário */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {reservaModal.extras_escolhidos && Object.keys(reservaModal.extras_escolhidos).length > 0 && (
+                  <div>
+                    <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-3">{isEn ? 'Selected Extras' : 'Extras Subscritos'}</h4>
+                    <ul className="list-disc pl-5 text-sm font-bold text-slate-700 space-y-1">
+                      {reservaModal.extras_escolhidos.extAlimentacao && <li>Alimentação Extra</li>}
+                      {reservaModal.extras_escolhidos.extAlojamento && <li>Alojamento Extra</li>}
+                      {reservaModal.extras_escolhidos.extTransporte && <li>Transporte</li>}
+                      {reservaModal.extras_escolhidos.extProlongamento && <li>Prolongamento de Horário</li>}
+                    </ul>
+                  </div>
+                )}
+                
+                {reservaModal.respostas_customizadas && Object.keys(reservaModal.respostas_customizadas).length > 0 && (
+                  <div className={!reservaModal.extras_escolhidos ? "md:col-span-2" : ""}>
+                    <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-3">{isEn ? 'Custom Answers' : 'Formulário do Organizador'}</h4>
+                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col gap-3">
+                      {Object.entries(reservaModal.respostas_customizadas).map(([pergunta, resposta]: any, i) => (
+                        <div key={i}>
+                          <p className="text-xs font-bold text-slate-500 mb-0.5">{pergunta}</p>
+                          <p className="text-sm font-bold text-slate-900 m-0">{resposta}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
 
-              <a 
-                href={`mailto:?subject=${encodeURIComponent(isEn ? `HelloCamp: ${shareTitle}` : `HelloCamp: ${shareTitle}`)}&body=${encodeURIComponent(isEn ? `Check out these holiday camps I found on HelloCamp:\n\n${shareUrl}` : `Vê estes campos de férias que encontrei na HelloCamp:\n\n${shareUrl}`)}`}
-                className="flex items-center gap-3 p-4 rounded-xl border border-slate-200 hover:border-slate-900 transition-colors group no-underline"
-              >
-                <div className="text-slate-700 group-hover:text-slate-900">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+              {/* Resumo Financeiro */}
+              <div className="bg-slate-900 rounded-2xl p-6 text-white mt-auto">
+                <div className="flex justify-between items-center mb-4">
+                  <span className="text-sm font-bold text-slate-400 uppercase tracking-widest">{isEn ? 'Financial Status' : 'Situação Financeira'}</span>
+                  <span className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest ${reservaModal.status_pagamento === 'Reembolsado' || reservaModal.status_reembolso === 'Reembolsado' ? 'bg-red-500/20 text-red-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
+                    {reservaModal.status_pagamento === 'Reembolsado' || reservaModal.status_reembolso === 'Reembolsado' ? 'Cancelada' : reservaModal.status_pagamento || 'Pendente'}
+                  </span>
                 </div>
-                <span className="text-sm font-bold text-slate-800">{isEn ? 'Email' : 'Enviar e-mail'}</span>
-              </a>
-
-              <a 
-                href={`https://wa.me/?text=${encodeURIComponent(isEn ? `Check out these holiday camps: ${shareUrl}` : `Vê estes campos de férias: ${shareUrl}`)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-3 p-4 rounded-xl border border-slate-200 hover:border-emerald-500 transition-colors group no-underline"
-              >
-                <div className="text-emerald-500">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+                <div className="flex justify-between items-end border-t border-slate-700 pt-4">
+                  <div>
+                    <p className="text-xs text-slate-400 font-bold mb-1">{isEn ? 'Amount Paid' : 'Valor já liquidado'}</p>
+                    <p className="text-lg font-black m-0">{reservaModal.valor_pago || 0}€</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-slate-400 font-bold mb-1">{isEn ? 'Total Cost' : 'Custo Total'}</p>
+                    <p className={`text-2xl font-black m-0 ${reservaModal.status_pagamento === 'Reembolsado' || reservaModal.status_reembolso === 'Reembolsado' ? 'line-through text-slate-600' : ''}`}>
+                      {reservaModal.valor_total}€
+                    </p>
+                  </div>
                 </div>
-                <span className="text-sm font-bold text-slate-800">WhatsApp</span>
-              </a>
-
-              <a 
-                href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-3 p-4 rounded-xl border border-slate-200 hover:border-blue-600 transition-colors group no-underline"
-              >
-                <div className="text-blue-600">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path></svg>
-                </div>
-                <span className="text-sm font-bold text-slate-800">Facebook</span>
-              </a>
-
-              <a 
-                href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(isEn ? 'Check out this list on HelloCamp!' : 'Vê esta lista na HelloCamp!')}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-3 p-4 rounded-xl border border-slate-200 hover:border-slate-900 transition-colors group no-underline"
-              >
-                <div className="text-slate-900">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4l11.73 15H20L8.27 4H4zm14 0L10.27 15H4l7.73-15H18z"></path></svg>
-                </div>
-                <span className="text-sm font-bold text-slate-800">X (Twitter)</span>
-              </a>
+              </div>
 
             </div>
           </div>
+        </div>
+      )}
+
+      {/* MODAL DE PARTILHA */}
+      {isShareModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsShareModalOpen(false)}>
+           <div className="bg-white rounded-3xl w-full max-w-lg p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+              <h3 className="font-black text-slate-900 text-xl mb-6">Partilhar Ligação</h3>
+              <div className="flex gap-4">
+                <input type="text" readOnly value={shareUrl} className="flex-1 bg-slate-100 p-3 rounded-xl text-sm text-slate-500 border border-slate-200 outline-none" />
+                <button onClick={handleCopyLink} className="bg-slate-900 text-white font-bold px-6 py-3 rounded-xl whitespace-nowrap">
+                  {copied ? 'Copiado!' : 'Copiar'}
+                </button>
+              </div>
+           </div>
         </div>
       )}
 
