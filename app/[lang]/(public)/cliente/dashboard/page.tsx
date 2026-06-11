@@ -4,7 +4,7 @@ import { useEffect, useState, use } from "react";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import React from "react";
-import SugestoesMagicas from "../../components/SugestoesMagicas"; // Confirme se o caminho (import) está correto para si
+import SugestoesMagicas from "../../components/SugestoesMagicas";
 
 export default function DashboardCliente({ params }: { params: Promise<{ lang: string }> }) {
   const { lang } = use(params);
@@ -14,6 +14,7 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
   const [wishlists, setWishlists] = useState<any[]>([]);
   const [primeiraCriancaId, setPrimeiraCriancaId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingStripe, setLoadingStripe] = useState<string | null>(null);
 
   // Estados para o Modal de Partilha (Lightbox Airbnb style)
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
@@ -26,11 +27,11 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      // 1. Buscar Reservas
+      // 1. Buscar Reservas usando cliente_id
       const { data: reservasData } = await supabase
         .from('reservas')
-        .select(`*, campos ( id, nome, nome_en, imagem, local, local_en ), criancas ( nome )`)
-        .eq('user_id', session.user.id) 
+        .select(`*, campos ( id, nome, nome_en, imagem, local, local_en, organizador_id ), criancas ( nome )`)
+        .eq('cliente_id', session.user.id) 
         .order('created_at', { ascending: false });
       setReservas(reservasData || []);
 
@@ -43,7 +44,7 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
       setWishlists(wishData || []);
 
       // 3. Buscar uma Criança para as Sugestões Mágicas
-      const { data: criancasData } = await supabase.from('criancas').select('id').eq('user_id', session.user.id).limit(1);
+      const { data: criancasData } = await supabase.from('criancas').select('id').eq('cliente_id', session.user.id).limit(1);
       if (criancasData && criancasData.length > 0) {
         setPrimeiraCriancaId(criancasData[0].id);
       }
@@ -52,9 +53,44 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
     };
 
     fetchData();
-  }, []);
+  }, [lang]);
 
-  // Abre a Lightbox e prepara os links
+  // Função para pagar a segunda parcela
+  const handlePagarRestante = async (reserva: any) => {
+    setLoadingStripe(reserva.id);
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      const { data: orgData } = await supabase
+        .from('perfis')
+        .select('stripe_account_id')
+        .eq('id', reserva.campos.organizador_id)
+        .single();
+
+      const res = await fetch('/api/stripe-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reservasIds: [reserva.id],
+          totalAmount: reserva.valor_em_falta, 
+          userEmail: user?.email,
+          lang: lang,
+          campoNome: isEn && reserva.campos.nome_en ? reserva.campos.nome_en : reserva.campos.nome,
+          stripeAccountId: orgData?.stripe_account_id,
+          tipoPagamento: 'pagamento_final'
+        })
+      });
+
+      if (!res.ok) throw new Error("Erro de servidor ao processar pagamento.");
+      const data = await res.json();
+      if (data.url) window.location.href = data.url;
+    } catch (err: any) {
+      alert("Erro ao iniciar pagamento: " + err.message);
+      setLoadingStripe(null);
+    }
+  };
+
   const abrirModalPartilha = (token: string, nomeLista: string) => {
     const url = `${window.location.origin}/${lang}/lista/${token}`;
     setShareUrl(url);
@@ -67,7 +103,7 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
     try {
       await navigator.clipboard.writeText(shareUrl);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000); // Volta ao normal após 2 segundos
+      setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       console.error("Failed to copy!", err);
     }
@@ -87,7 +123,6 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
         </p>
       </div>
 
-      {/* MÓDULO INTELIGENTE: SUGESTÕES MÁGICAS */}
       {primeiraCriancaId && (
         <SugestoesMagicas criancaId={primeiraCriancaId} lang={lang} />
       )}
@@ -108,25 +143,28 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
             const campo = reserva.campos;
             const nomeCampo = isEn && campo?.nome_en ? campo.nome_en : campo?.nome;
             const localCampo = isEn && campo?.local_en ? campo.local_en : campo?.local;
+            
+            const isSinalPago = reserva.status_pagamento === 'Sinal Pago';
+            const isPago = reserva.status_pagamento === 'Pago';
+            const valorPago = Number(reserva.valor_pago) || (isPago ? reserva.valor_total : 0);
+            const valorFalta = Number(reserva.valor_em_falta) || 0;
 
             return (
-              <Link 
-                key={reserva.id} 
-                href={`/${lang}/campo/${campo?.id}`}
-                className="group flex flex-col bg-white rounded-3xl border border-slate-200 overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
-              >
-                <div className="h-48 w-full relative overflow-hidden bg-slate-100">
+              <div key={reserva.id} className="group flex flex-col bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm relative">
+                <Link href={`/${lang}/campo/${campo?.id}`} className="absolute inset-0 z-0"><span className="sr-only">Ver Campo</span></Link>
+                
+                <div className="h-48 w-full relative overflow-hidden bg-slate-100 z-10 pointer-events-none">
                   <img src={campo?.imagem || 'https://images.unsplash.com/photo-1502680390469-be75c86b636f?q=80&w=600'} alt={nomeCampo} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
                   <div className="absolute top-4 right-4 bg-slate-900/80 backdrop-blur-sm px-3 py-1.5 rounded-full text-white text-[10px] font-black tracking-widest uppercase shadow-sm">
                     {reserva.turno_nome || 'Turno'}
                   </div>
                 </div>
 
-                <div className="p-6 flex flex-col flex-1">
+                <div className="p-6 flex flex-col flex-1 z-10 pointer-events-none">
                   <h3 className="text-xl font-black text-slate-900 m-0 leading-tight">{nomeCampo}</h3>
                   <p className="text-sm font-bold text-slate-500 mt-2 mb-6">📍 {localCampo}</p>
                   
-                  <div className="border-t border-slate-100 pt-5 mt-auto flex justify-between items-end">
+                  <div className="border-t border-slate-100 pt-5 mt-auto flex justify-between items-end mb-4">
                     <div>
                       <span className="block text-[10px] text-slate-400 font-black uppercase tracking-widest mb-1">{isEn ? 'PARTICIPANT' : 'PARTICIPANTE'}</span>
                       <span className="text-sm font-bold text-slate-700">👦 {reserva.criancas?.nome}</span>
@@ -137,13 +175,41 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
                     </div>
                   </div>
                 </div>
-              </Link>
+
+                {/* PAINEL FINANCEIRO DE AÇÃO NO DASHBOARD */}
+                <div className="px-6 pb-6 z-20">
+                  {isSinalPago && valorFalta > 0 ? (
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center justify-between shadow-inner">
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-amber-700 m-0">Falta Pagar</p>
+                        <p className="text-lg font-black text-amber-600 m-0">{valorFalta.toFixed(2)}€</p>
+                      </div>
+                      <button 
+                        onClick={() => handlePagarRestante(reserva)}
+                        disabled={loadingStripe === reserva.id}
+                        className="bg-amber-600 text-white font-bold text-sm px-4 py-2.5 rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50 shadow-sm"
+                      >
+                        {loadingStripe === reserva.id ? 'A processar...' : 'Pagar Restante'}
+                      </button>
+                    </div>
+                  ) : isPago ? (
+                    <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 text-center">
+                      <span className="text-xs font-black uppercase tracking-widest text-emerald-600">✓ Vaga Confirmada (100% Pago)</span>
+                    </div>
+                  ) : (
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center">
+                      <span className="text-xs font-black uppercase tracking-widest text-slate-500">⏳ Pagamento Pendente</span>
+                    </div>
+                  )}
+                </div>
+
+              </div>
             );
           })}
         </div>
       )}
 
-      {/* SECÇÃO 2: WISHLISTS (Ideias para o Verão) */}
+      {/* SECÇÃO 2: WISHLISTS */}
       <div>
         <h2 className="text-2xl font-black text-slate-900 mb-6">{isEn ? 'Your Wishlists' : 'As Suas Listas de Férias'}</h2>
         
@@ -166,7 +232,6 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
                       {isEn ? 'View list' : 'Ver lista'} &rarr;
                     </Link>
                     
-                    {/* Botão que abre a Lightbox de Partilha */}
                     <button 
                       onClick={() => abrirModalPartilha(lista.token_partilha, lista.nome)}
                       title={isEn ? "Share List" : "Partilhar Lista"}
@@ -192,7 +257,6 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
             className="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col transform transition-transform" 
             onClick={e => e.stopPropagation()}
           >
-            {/* Header da Lightbox */}
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
               <h3 className="font-black text-slate-900 text-xl">{isEn ? 'Share this list' : 'Partilhar esta lista'}</h3>
               <button 
@@ -203,7 +267,6 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
               </button>
             </div>
             
-            {/* Preview do que está a ser partilhado */}
             <div className="px-6 pt-6 pb-2">
               <div className="flex items-center gap-4">
                 <div className="w-16 h-16 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 text-2xl border border-emerald-100">
@@ -216,9 +279,7 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
               </div>
             </div>
 
-            {/* Grelha de Botões de Partilha */}
             <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-              
               <button 
                 onClick={handleCopyLink}
                 className="flex items-center gap-3 p-4 rounded-xl border border-slate-200 hover:border-slate-900 transition-colors group text-left"

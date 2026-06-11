@@ -6,6 +6,7 @@ export const dynamic = 'force-dynamic';
 export async function POST(req: Request) {
   const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
   if (!stripeSecretKey) return NextResponse.json({ error: "Chave não encontrada." }, { status: 500 });
+  
   const stripe = new Stripe(stripeSecretKey);
 
   try {
@@ -21,11 +22,15 @@ export async function POST(req: Request) {
       customer_email: userEmail,
       customer_creation: 'always', 
       line_items: [{
-        price_data: { currency: 'eur', product_data: { name: nomeProdutoStripe }, unit_amount: Math.round(valorCobrarAgora * 100) },
+        price_data: { 
+          currency: 'eur', 
+          product_data: { name: nomeProdutoStripe }, 
+          unit_amount: Math.round(valorCobrarAgora * 100) 
+        },
         quantity: 1,
       }],
       mode: 'payment',
-      payment_intent_data: { setup_future_usage: 'off_session' },
+      // NOTA: A linha setup_future_usage foi removida para garantir que o MB WAY é sempre suportado!
       success_url: `${siteUrl}/${lang}/sucesso?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${siteUrl}/${lang}`,
       metadata: {
@@ -36,9 +41,11 @@ export async function POST(req: Request) {
     };
 
     if (stripeAccountId) {
-      // CORREÇÃO TS: Usar `any` temporário para evitar erros de tipagem estrita no transfer_data
-      (sessionData as any).payment_intent_data.application_fee_amount = Math.round((valorCobrarAgora * 0.15) * 100);
-      (sessionData as any).payment_intent_data.transfer_data = { destination: stripeAccountId };
+      // Usar `any` temporário para contornar tipagem estrita do Stripe Connect
+      (sessionData as any).payment_intent_data = {
+        application_fee_amount: Math.round((valorCobrarAgora * 0.15) * 100),
+        transfer_data: { destination: stripeAccountId }
+      };
     }
 
     const session = await stripe.checkout.sessions.create(sessionData);

@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, use } from "react";
-import { supabase } from "../../../../../lib/supabase";
+import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import React from "react";
 
 export default function LoginAdmin({ params }: { params: Promise<{ lang: string }> }) {
   const { lang } = use(params);
@@ -20,7 +21,8 @@ export default function LoginAdmin({ params }: { params: Promise<{ lang: string 
     setLoading(true);
     setError(null);
 
-    const { error: authError } = await supabase.auth.signInWithPassword({
+    // 1. Tenta autenticar
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
@@ -31,7 +33,23 @@ export default function LoginAdmin({ params }: { params: Promise<{ lang: string 
       return;
     }
 
-    router.push(`/${lang}/admin/dashboard`);
+    if (authData?.user) {
+      // 2. Procura imediatamente o nível de acesso do utilizador
+      const { data: perfil } = await supabase
+        .from('perfis')
+        .select('admin')
+        .eq('id', authData.user.id)
+        .single();
+
+      // 3. Redirecionamento Dinâmico Inteligente
+      if (perfil?.admin === true) {
+        // Vai para a visão global da HelloCamp
+        router.push(`/${lang}/superadmin`);
+      } else {
+        // Vai para a gestão normal de um Campo (Parceiro B2B)
+        router.push(`/${lang}/admin/campos`);
+      }
+    }
   };
 
   return (
