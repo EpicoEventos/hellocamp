@@ -12,12 +12,11 @@ export default function GestaoCamposHQ({ params }: { params: Promise<{ lang: str
   const [campos, setCampos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Estados para o Modal de Comissão do Campo
+  // Estados para o Modal de Comissão
   const [showModal, setShowModal] = useState(false);
   const [campoEmEdicao, setCampoEmEdicao] = useState<any>(null);
 
   const fetchCamposGerais = async () => {
-    // Busca Segura em 2 Passos (Evita o erro {})
     const { data: camposData, error: errCampos } = await supabase
       .from('campos')
       .select('*')
@@ -35,7 +34,7 @@ export default function GestaoCamposHQ({ params }: { params: Promise<{ lang: str
       const organizador = perfisData?.find(p => p.id === campo.organizador_id);
       return {
         ...campo,
-        perfis: organizador || { empresa_nome: 'Desconhecido', email: '' }
+        perfis: organizador || { empresa_nome: 'Sem Registo Associado', email: '' }
       };
     });
 
@@ -48,7 +47,7 @@ export default function GestaoCamposHQ({ params }: { params: Promise<{ lang: str
   }, []);
 
   const handleApagarCampo = async (id: string, nomeCampo: string) => {
-    if (!window.confirm(`Tem a certeza ABSOLUTA que deseja apagar o campo "${nomeCampo}"?`)) return;
+    if (!window.confirm(`ACÃO SUPERADMIN: Tem a certeza ABSOLUTA que deseja apagar o campo "${nomeCampo}" permanentemente de toda a plataforma?`)) return;
     const { error } = await supabase.from('campos').delete().eq('id', id);
     if (!error) {
       alert("Campo removido com sucesso.");
@@ -67,13 +66,13 @@ export default function GestaoCamposHQ({ params }: { params: Promise<{ lang: str
     }).eq('id', campoEmEdicao.id);
 
     if (!error) {
-      alert("Comissão do campo atualizada!");
+      alert("Comissão específica deste programa atualizada com sucesso!");
       setShowModal(false);
       fetchCamposGerais();
     } else alert("Erro: " + error.message);
   };
 
-  if (loading) return <div style={{ padding: '3rem', textAlign: 'center' }}>A carregar base de dados de programas...</div>;
+  if (loading) return <div style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>A carregar base de dados global de programas...</div>;
 
   return (
     <div style={{ fontFamily: 'sans-serif', paddingBottom: '3rem' }}>
@@ -83,7 +82,7 @@ export default function GestaoCamposHQ({ params }: { params: Promise<{ lang: str
           Diretório Global de Campos
         </h1>
         <p style={{ color: '#64748b', marginTop: '0.5rem', fontSize: '15px' }}>
-          Monitorização de todos os programas criados pelos parceiros na plataforma HelloCamp.
+          Monitorização anti-fraude, moderação e override de comissões.
         </p>
       </div>
 
@@ -92,13 +91,13 @@ export default function GestaoCamposHQ({ params }: { params: Promise<{ lang: str
         <div style={modalOverlayStyle}>
           <div style={modalContentStyle}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
-              <h2 style={{ margin: 0, fontWeight: '900', fontSize: '1.25rem' }}>Comissão: {campoEmEdicao.nome}</h2>
+              <h2 style={{ margin: 0, fontWeight: '900', fontSize: '1.25rem' }}>Ajuste de Margem: {campoEmEdicao.nome}</h2>
               <button onClick={() => setShowModal(false)} style={{ background:'none', border:'none', fontSize:'1.5rem', cursor:'pointer' }}>×</button>
             </div>
             
             <form onSubmit={handleSalvarComissao} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <p style={{ fontSize: '13px', color: '#64748b', marginBottom: '1rem' }}>
-                Se deixar em branco, este campo usará a comissão geral do parceiro ({campoEmEdicao.perfis?.taxa_comissao || 12}% - {campoEmEdicao.perfis?.base_comissao || 'total'}).
+                Se deixar em branco, este campo usará a comissão geral acordada com o parceiro ({campoEmEdicao.perfis?.taxa_comissao || 12}% - {campoEmEdicao.perfis?.base_comissao || 'total'}).
               </p>
               <div>
                 <label style={labelStyle}>Taxa de Comissão Específica (%)</label>
@@ -114,7 +113,7 @@ export default function GestaoCamposHQ({ params }: { params: Promise<{ lang: str
                   <option value="sem_comissao">Isento de Comissão (0%)</option>
                 </select>
               </div>
-              <button type="submit" style={btnSubmitStyle}>Aplicar Regra ao Campo</button>
+              <button type="submit" style={btnSubmitStyle}>Aplicar Override Financeiro</button>
             </form>
           </div>
         </div>
@@ -125,15 +124,15 @@ export default function GestaoCamposHQ({ params }: { params: Promise<{ lang: str
           <thead style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
             <tr>
               <th style={thStyle}>NOME DO PROGRAMA</th>
-              <th style={thStyle}>PARCEIRO (ORGANIZADOR)</th>
-              <th style={thStyle}>COMISSÃO APLICADA</th>
-              <th style={thStyle}>PREÇO</th>
-              <th style={thStyle}>AÇÕES DE MODERAÇÃO</th>
+              <th style={thStyle}>ENTIDADE EXPLORADORA</th>
+              <th style={thStyle}>MARGEM HELLOCAMP</th>
+              <th style={thStyle}>TICKET BASE</th>
+              <th style={thStyle}>AÇÕES DE AUDITORIA</th>
             </tr>
           </thead>
           <tbody>
             {campos.length === 0 ? (
-              <tr><td colSpan={5} style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>Não existem campos registados.</td></tr>
+              <tr><td colSpan={5} style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>Não existem programas registados no sistema.</td></tr>
             ) : (
               campos.map((campo) => {
                 const isCustom = campo.taxa_comissao !== null && campo.taxa_comissao !== undefined;
@@ -147,12 +146,12 @@ export default function GestaoCamposHQ({ params }: { params: Promise<{ lang: str
                     </td>
                     
                     <td style={tdStyle}>
-                      <span style={{ fontWeight: 'bold', color: '#334155' }}>{campo.perfis?.empresa_nome || 'Desconhecido'}</span>
+                      <span style={{ fontWeight: 'bold', color: '#334155' }}>{campo.perfis?.empresa_nome}</span>
                     </td>
                     
                     <td style={tdStyle}>
                       <span style={{ backgroundColor: isCustom ? '#fefce8' : '#f1f5f9', color: isCustom ? '#854d0e' : '#475569', padding: '0.25rem 0.5rem', borderRadius: '0.5rem', fontSize: '12px', fontWeight: 'bold', border: `1px solid ${isCustom ? '#fef08a' : '#e2e8f0'}` }}>
-                        {taxaVisual}% {isCustom ? '⭐ (Específica)' : '(Geral)'}
+                        {taxaVisual}% {isCustom ? '⭐ (Override)' : '(Global)'}
                       </span>
                     </td>
                     
@@ -161,16 +160,16 @@ export default function GestaoCamposHQ({ params }: { params: Promise<{ lang: str
                     <td style={tdStyle}>
                       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                         <Link href={`/${lang}/campo/${campo.id}`} target="_blank" style={btnActionStyle('#f1f5f9', '#334155')}>
-                          👁️ Ver
+                          👁️ Front-end
                         </Link>
                         <Link href={`/${lang}/superadmin/campos/editar/${campo.id}`} target="_blank" style={btnActionStyle('#e0f2fe', '#0369a1')}>
-                          ✏️ Editar
+                          ✏️ Moderação
                         </Link>
                         <button onClick={() => { setCampoEmEdicao(campo); setShowModal(true); }} style={btnActionStyle('#fefce8', '#854d0e')}>
-                          ⚙️ Comissão
+                          ⚙️ Margem HQ
                         </button>
                         <button onClick={() => handleApagarCampo(campo.id, campo.nome)} style={btnActionStyle('#fef2f2', '#dc2626')}>
-                          🗑️ Apagar
+                          🗑️ Banir
                         </button>
                       </div>
                     </td>
@@ -185,7 +184,6 @@ export default function GestaoCamposHQ({ params }: { params: Promise<{ lang: str
   );
 }
 
-// ESTILOS GERAIS
 const modalOverlayStyle = { position: 'fixed' as const, inset: 0, backgroundColor: 'rgba(15,23,42,0.8)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' };
 const modalContentStyle = { backgroundColor: 'white', width: '100%', maxWidth: '500px', borderRadius: '1.5rem', padding: '2.5rem', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' };
 const labelStyle = { display: 'block', fontSize: '12px', fontWeight: '800', color: '#334155', textTransform: 'uppercase' as const, marginBottom: '0.5rem' };
@@ -194,4 +192,4 @@ const selectStyle = { ...inputStyle, cursor: 'pointer', appearance: 'none' as co
 const btnSubmitStyle = { width: '100%', padding: '1.25rem', backgroundColor: '#0f172a', color: 'white', fontWeight: '900', borderRadius: '0.75rem', border: 'none', cursor: 'pointer', fontSize: '1.125rem' };
 const thStyle = { padding: '1.25rem 1.5rem', fontSize: '11px', fontWeight: '800', color: '#64748b', letterSpacing: '0.05em' };
 const tdStyle = { padding: '1rem 1.5rem', color: '#334155', verticalAlign: 'middle' };
-const btnActionStyle = (bg: string, color: string) => ({ padding: '0.5rem 0.75rem', backgroundColor: bg, color: color, borderRadius: '0.5rem', textDecoration: 'none', fontWeight: 'bold', fontSize: '12px', cursor: 'pointer', border: 'none', display: 'inline-flex', alignItems: 'center' });
+const btnActionStyle = (bg: string, color: string) => ({ padding: '0.5rem 0.75rem', backgroundColor: bg, color: color, borderRadius: '0.5rem', textDecoration: 'none' as const, fontWeight: 'bold', fontSize: '12px', cursor: 'pointer', border: 'none', display: 'inline-flex', alignItems: 'center' });
