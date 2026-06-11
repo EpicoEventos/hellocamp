@@ -44,29 +44,48 @@ export async function POST(req: Request) {
     return new NextResponse(`Webhook Error: ${error.message}`, { status: 400 });
   }
 
-  if (event.type === 'checkout.session.completed') {
+  // O MB WAY dispara primeiro o completed (com status 'unpaid') e depois o async_payment_succeeded quando aprovado no telemóvel.
+  // Por isso, agrupamos ambos para tratar as aprovações.
+  if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
     const session = event.data.object as Stripe.Checkout.Session;
     
+    // IMPORTANTE PARA MB WAY: Se a sessão for criada, mas o utilizador ainda não tiver ido à App aprovar, a Stripe diz que está "unpaid".
+    // Só processamos a reserva e mandamos o email se o pagamento estiver garantido ("paid").
+    if (session.payment_status !== 'paid') {
+      return new NextResponse('A aguardar aprovação de pagamento assíncrono (ex: MB WAY).', { status: 200 });
+    }
+
     if (session.metadata?.reservasIds) {
       const reservasIds = JSON.parse(session.metadata.reservasIds);
       
-      // LÓGICA DE PAGAMENTO FRACIONADO VS TOTAL
       const isSinal = session.metadata.pagamento_tipo === '50_sinal';
+      const isPagamentoFinal = session.metadata.pagamento_tipo === 'pagamento_final';
       const valorOriginalTotal = Number(session.metadata.valor_total_original || 0);
       const valorCobradoAgora = (session.amount_total || 0) / 100;
       
-      const novoStatus = isSinal ? 'Sinal Pago' : 'Pago';
-      const valorEmFalta = isSinal ? (valorOriginalTotal - valorCobradoAgora) : 0;
+      let novoStatus = 'Pago';
+      let valorEmFalta = 0;
+      let valorPagoBaseDeDados = valorCobradoAgora;
+
+      if (isSinal) {
+        novoStatus = 'Sinal Pago';
+        valorEmFalta = valorOriginalTotal - valorCobradoAgora;
+      } else if (isPagamentoFinal) {
+        novoStatus = 'Pago';
+        // Se for o pagamento final, o valor pago total na base de dados passa a ser o valor original (100%)
+        valorPagoBaseDeDados = valorOriginalTotal; 
+      }
+
       const stripeCustomerId = typeof session.customer === 'string' ? session.customer : null;
 
-      // 1. ATUALIZAR STATUS FINANCEIRO
+      // 1. ATUALIZAR STATUS FINANCEIRO NA BASE DE DADOS
       const { error: updateError } = await supabase
         .from('reservas')
         .update({ 
           status_pagamento: novoStatus,
-          valor_pago: valorCobradoAgora,
+          valor_pago: valorPagoBaseDeDados,
           valor_em_falta: valorEmFalta,
-          stripe_customer_id: stripeCustomerId
+          ...(stripeCustomerId ? { stripe_customer_id: stripeCustomerId } : {}) // Só atualiza se existir
         })
         .in('id', reservasIds);
 
@@ -75,7 +94,7 @@ export async function POST(req: Request) {
         return new NextResponse('Erro na Base de Dados', { status: 500 });
       }
 
-      // 2. RECOLHER DADOS EXAUSTIVOS
+      // 2. RECOLHER DADOS EXAUSTIVOS PARA EMAILS
       const { data: reservasData } = await supabase
         .from('reservas')
         .select(`
@@ -153,23 +172,27 @@ export async function POST(req: Request) {
           `;
         });
 
-        const nomesCriancasResumo = nomesSimplesArray.join(', ');
+        // Textos Dinâmicos para os Emails
+        let tituloEmailPai = `Confirmação de Reserva - ${campoNome}`;
+        let statusTextoPai = `<p style="font-size: 15px; line-height: 1.6; color: #475569;">A sua reserva para o programa <strong>${campoNome}</strong> encontra-se validada e totalmente paga.</p>`;
         
-        // Textos Dinâmicos de Acordo com o Status
-        const statusTextoPai = isSinal 
-          ? `<p style="font-size: 15px; line-height: 1.6; color: #475569;">A sua vaga para o programa <strong>${campoNome}</strong> encontra-se garantida através do pagamento do sinal. <br/><br/><strong>Atenção:</strong> O valor remanescente (${valorEmFalta.toFixed(2)}€) será cobrado automaticamente (ou ser-lhe-á solicitado o pagamento) 1 semana antes do início do programa.</p>`
-          : `<p style="font-size: 15px; line-height: 1.6; color: #475569;">A sua reserva para o programa <strong>${campoNome}</strong> encontra-se validada e totalmente paga.</p>`;
+        if (isSinal) {
+          statusTextoPai = `<p style="font-size: 15px; line-height: 1.6; color: #475569;">A sua vaga para o programa <strong>${campoNome}</strong> encontra-se garantida através do pagamento do sinal. <br/><br/><strong>Atenção:</strong> O valor remanescente (${valorEmFalta.toFixed(2)}€) deverá ser pago 1 semana antes do início do programa através do seu Portal de Cliente HelloCamp.</p>`;
+        } else if (isPagamentoFinal) {
+          tituloEmailPai = `Liquidação Final - ${campoNome}`;
+          statusTextoPai = `<p style="font-size: 15px; line-height: 1.6; color: #475569;">O pagamento da segunda tranche da sua reserva para o programa <strong>${campoNome}</strong> foi liquidado com sucesso. A inscrição encontra-se totalmente paga.</p>`;
+        }
 
         const financeiroOrg = isSinal
           ? `<tr><td style="padding: 4px 0; color: #64748b;">Sinal Recebido (50%):</td><td style="font-weight: bold; color: #059669;">${valorCobradoAgora.toFixed(2)}€</td></tr><tr><td style="padding: 4px 0; color: #64748b;">Valor Pendente:</td><td style="font-weight: bold; color: #eab308;">${valorEmFalta.toFixed(2)}€</td></tr>`
-          : `<tr><td style="padding: 4px 0; color: #64748b;">Valor Total Pago:</td><td style="font-weight: bold; color: #059669;">${valorCobradoAgora.toFixed(2)}€</td></tr>`;
+          : `<tr><td style="padding: 4px 0; color: #64748b;">Valor Pago Agora:</td><td style="font-weight: bold; color: #059669;">${valorCobradoAgora.toFixed(2)}€</td></tr><tr><td style="padding: 4px 0; color: #64748b;">Situação:</td><td style="font-weight: bold; color: #059669;">100% Pago</td></tr>`;
 
         // A. EMAIL PAI
-        if (emailPai) {
+        if (emailPai && !isPagamentoFinal) {
           await resend.emails.send({
             from: 'HelloCamp Reservas <info@hellocamp.pt>', 
             to: emailPai,
-            subject: `Confirmação de Reserva - ${campoNome}`,
+            subject: tituloEmailPai,
             html: `
               <div style="font-family: 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 30px 20px; color: #0f172a;">
                 <h1 style="font-size: 24px; font-weight: 900; text-align: center; margin-bottom: 30px; color: #0f172a;">HelloCamp</h1>
@@ -198,34 +221,44 @@ export async function POST(req: Request) {
         }
 
         // B. EMAIL ORGANIZADOR
-        await resend.emails.send({
-          from: 'HelloCamp Parceiros <info@hellocamp.pt>',
-          to: emailCampo,
-          subject: `Nova Inscrição Processada - ${campoNome}`,
-          html: `
-            <div style="font-family: 'Helvetica Neue', Arial, sans-serif; max-width: 650px; margin: 0 auto; padding: 30px 20px; color: #0f172a;">
-              <h2 style="font-size: 22px; font-weight: 700; border-bottom: 2px solid #0f172a; padding-bottom: 10px;">Nova Inscrição Processada</h2>
-              <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 25px 0;">
-                <h3 style="font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin-top: 0; border-bottom: 1px solid #cbd5e1; padding-bottom: 8px;">Dados do Encarregado de Educação</h3>
-                <table width="100%" style="font-size: 14px; color: #334155; margin-top: 10px; border-collapse: collapse;">
-                  <tr><td width="30%" style="padding: 4px 0; color: #64748b;">Nome Completo:</td><td style="font-weight: bold;">${nomePai}</td></tr>
-                  <tr><td style="padding: 4px 0; color: #64748b;">Telefone:</td><td style="font-weight: bold;">${telefonePai}</td></tr>
-                  <tr><td style="padding: 4px 0; color: #64748b;">Email:</td><td style="font-weight: bold;"><a href="mailto:${emailPai}" style="color: #2563eb;">${emailPai}</a></td></tr>
-                  ${financeiroOrg}
-                </table>
+        // Se for só o pagamento final, o organizador recebe um aviso rápido, se for a inscrição original recebe a ficha completa
+        if (isPagamentoFinal) {
+           await resend.emails.send({
+            from: 'HelloCamp Parceiros <info@hellocamp.pt>',
+            to: emailCampo,
+            subject: `Liquidação Recebida - ${campoNome}`,
+            html: `<div style="font-family: Arial, sans-serif; padding: 20px; color: #0f172a;"><h2>Pagamento Final Recebido</h2><p>O encarregado de educação <strong>${nomePai}</strong> liquidou a segunda parcela de <strong>${valorCobradoAgora.toFixed(2)}€</strong> referente à inscrição no programa ${campoNome}. A reserva encontra-se agora 100% paga.</p></div>`,
+          });
+        } else {
+          await resend.emails.send({
+            from: 'HelloCamp Parceiros <info@hellocamp.pt>',
+            to: emailCampo,
+            subject: `Nova Inscrição Processada - ${campoNome}`,
+            html: `
+              <div style="font-family: 'Helvetica Neue', Arial, sans-serif; max-width: 650px; margin: 0 auto; padding: 30px 20px; color: #0f172a;">
+                <h2 style="font-size: 22px; font-weight: 700; border-bottom: 2px solid #0f172a; padding-bottom: 10px;">Nova Inscrição Processada</h2>
+                <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 25px 0;">
+                  <h3 style="font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin-top: 0; border-bottom: 1px solid #cbd5e1; padding-bottom: 8px;">Dados do Encarregado de Educação</h3>
+                  <table width="100%" style="font-size: 14px; color: #334155; margin-top: 10px; border-collapse: collapse;">
+                    <tr><td width="30%" style="padding: 4px 0; color: #64748b;">Nome Completo:</td><td style="font-weight: bold;">${nomePai}</td></tr>
+                    <tr><td style="padding: 4px 0; color: #64748b;">Telefone:</td><td style="font-weight: bold;">${telefonePai}</td></tr>
+                    <tr><td style="padding: 4px 0; color: #64748b;">Email:</td><td style="font-weight: bold;"><a href="mailto:${emailPai}" style="color: #2563eb;">${emailPai}</a></td></tr>
+                    ${financeiroOrg}
+                  </table>
+                </div>
+                <h3 style="font-size: 14px; font-weight: 800; color: #0f172a; margin-top: 30px;">Detalhes e Ficha Clínica dos Participantes</h3>
+                ${blocoParticipantesOrg}
               </div>
-              <h3 style="font-size: 14px; font-weight: 800; color: #0f172a; margin-top: 30px;">Detalhes e Ficha Clínica dos Participantes</h3>
-              ${blocoParticipantesOrg}
-            </div>
-          `,
-        });
+            `,
+          });
+        }
 
-        // C. EMAIL ADMIN (Controlo)
+        // C. EMAIL ADMIN (Controlo HelloCamp)
         await resend.emails.send({
           from: 'HelloCamp Control <info@hellocamp.pt>',
-          to: 'HelloCamp Control <info@hellocamp.pt>',
-          subject: `[VENDA] ${valorCobradoAgora.toFixed(2)}€ ${isSinal ? '(SINAL)' : ''} - ${campoNome}`,
-          html: `<div style="font-family: monospace; font-size: 14px; padding: 20px;"><h2>Transação HelloCamp</h2><p>Recebido: ${valorCobradoAgora}€ | Falta: ${valorEmFalta}€</p><p>Cliente: ${nomePai}</p></div>`,
+          to: 'info@hellocamp.pt', // Fixo para controlo
+          subject: `[VENDA] ${valorCobradoAgora.toFixed(2)}€ ${isSinal ? '(SINAL)' : isPagamentoFinal ? '(SEGUNDA TRANCHE)' : '(100%)'} - ${campoNome}`,
+          html: `<div style="font-family: monospace; font-size: 14px; padding: 20px;"><h2>Transação HelloCamp</h2><p>Recebido Agora: ${valorCobradoAgora}€ | Falta Pagar: ${valorEmFalta}€</p><p>Cliente: ${nomePai}</p></div>`,
         });
       }
     }
