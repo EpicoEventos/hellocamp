@@ -4,6 +4,7 @@ import { useEffect, useState, use } from "react";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import React from "react";
+import SugestoesMagicas from "../../components/SugestoesMagicas";
 
 export default function DashboardCliente({ params }: { params: Promise<{ lang: string }> }) {
   const { lang } = use(params);
@@ -16,12 +17,22 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
   const [perfilPai, setPerfilPai] = useState<any>(null);
   const [dadosEmFalta, setDadosEmFalta] = useState<string[]>([]);
 
+  // Estado para controlar a Lightbox de Completar Perfil
+  const [isPerfilModalOpen, setIsPerfilModalOpen] = useState(false);
+  const [savingPerfil, setSavingPerfil] = useState(false);
+  const [perfilForm, setPerfilForm] = useState({
+    nome_completo: "",
+    nif: "",
+    telefone: "",
+    contacto_emergencia: ""
+  });
+
   // Listas de Dados Planos
   const [reservas, setReservas] = useState<any[]>([]);
   const [wishlists, setWishlists] = useState<any[]>([]);
   const [sugestoesVerdes, setSugestoesVerdes] = useState<any[]>([]);
 
-  // Estado para o Modal Detalhado da Reserva (Substitui o redirecionamento)
+  // Estado para o Modal Detalhado da Reserva
   const [reservaModal, setReservaModal] = useState<any>(null);
 
   // Estados para o Modal de Partilha (Lightbox)
@@ -30,58 +41,94 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
   const [shareTitle, setShareTitle] = useState("");
   const [copied, setCopied] = useState(false);
 
+  const verificarFaltas = (dados: any) => {
+    const faltas = [];
+    if (!dados.nome_completo || dados.nome_completo.trim() === "") faltas.push(isEn ? 'Full Name' : 'Nome do Encarregado de Educação');
+    if (!dados.nif || dados.nif.trim() === "") faltas.push('NIF (Para Faturação)');
+    if (!dados.telefone || dados.telefone.trim() === "") faltas.push(isEn ? 'Phone Number' : 'Número de Telemóvel');
+    if (!dados.contacto_emergencia || dados.contacto_emergencia.trim() === "") faltas.push(isEn ? 'Emergency Contact' : 'Contacto de Emergência Alternativo');
+    return faltas;
+  };
+
+  const fetchData = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+
+    const userId = session.user.id;
+
+    // Busca Plana e Segura de tabelas paralelas
+    const { data: perfilData } = await supabase.from('perfis').select('*').eq('id', userId).single();
+    const { data: reservasData } = await supabase.from('reservas').select('*').eq('cliente_id', userId).order('created_at', { ascending: false });
+    const { data: camposData } = await supabase.from('campos').select('id, nome, nome_en, imagem, local, local_en, organizador_id, preco');
+    const { data: criancasData } = await supabase.from('criancas').select('*').eq('cliente_id', userId);
+    const { data: wishData } = await supabase.from('wishlists').select('id, nome, token_partilha').eq('user_id', userId).order('created_at', { ascending: false });
+
+    if (perfilData) {
+      setPerfilPai(perfilData);
+      setPerfilForm({
+        nome_completo: perfilData.nome_completo || "",
+        nif: perfilData.nif || "",
+        telefone: perfilData.telefone || "",
+        contacto_emergencia: perfilData.contacto_emergencia || ""
+      });
+      setDadosEmFalta(verificarFaltas(perfilData));
+    }
+
+    // Cruzamento Manual de Reservas
+    const camposCompradosIds: string[] = [];
+    if (reservasData) {
+      const reservasCruzadas = reservasData.map(res => {
+        const campo = camposData?.find(c => c.id === res.campo_id) || {};
+        const crianca = criancasData?.find(cr => cr.id === res.crianca_id) || {};
+        camposCompradosIds.push(res.campo_id);
+
+        return { ...res, campos: campo, criancas: crianca };
+      });
+      setReservas(reservasCruzadas);
+    }
+
+    // Gerar Sugestões de Conversão
+    if (camposData) {
+      const recomendacoes = camposData
+        .filter(c => !camposCompradosIds.includes(c.id))
+        .slice(0, 3);
+      setSugestoesVerdes(recomendacoes);
+    }
+
+    setWishlists(wishData || []);
+    setLoading(false);
+  };
+
   useEffect(() => {
-    const fetchData = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const userId = session.user.id;
-
-      // 1. Busca Plana e Segura
-      const { data: perfilData } = await supabase.from('perfis').select('*').eq('id', userId).single();
-      const { data: reservasData } = await supabase.from('reservas').select('*').eq('cliente_id', userId).order('created_at', { ascending: false });
-      const { data: camposData } = await supabase.from('campos').select('id, nome, nome_en, imagem, local, local_en, organizador_id, preco');
-      const { data: criancasData } = await supabase.from('criancas').select('*').eq('cliente_id', userId);
-      const { data: wishData } = await supabase.from('wishlists').select('id, nome, token_partilha').eq('user_id', userId).order('created_at', { ascending: false });
-
-      // Verificação de Dados Importantes em Falta no Perfil do Pai
-      if (perfilData) {
-        setPerfilPai(perfilData);
-        const faltas = [];
-        if (!perfilData.nome_completo) faltas.push(isEn ? 'Full Name' : 'Nome do Encarregado de Educação');
-        if (!perfilData.nif) faltas.push('NIF (Para Faturação)');
-        if (!perfilData.telefone) faltas.push(isEn ? 'Phone Number' : 'Número de Telemóvel');
-        if (!perfilData.contacto_emergencia) faltas.push(isEn ? 'Emergency Contact' : 'Contacto de Emergência Alternativo');
-        setDadosEmFalta(faltas);
-      }
-
-      // Cruzamento Seguro de Reservas
-      const camposCompradosIds: string[] = [];
-      if (reservasData) {
-        const reservasCruzadas = reservasData.map(res => {
-          const campo = camposData?.find(c => c.id === res.campo_id) || {};
-          const crianca = criancasData?.find(cr => cr.id === res.crianca_id) || {};
-          camposCompradosIds.push(res.campo_id);
-
-          return { ...res, campos: campo, criancas: crianca };
-        });
-        setReservas(reservasCruzadas);
-      }
-
-      // Gerar Sugestões Limpas e Verdes (Excluindo o que já comprou)
-      if (camposData) {
-        const recomendacoes = camposData
-          .filter(c => !camposCompradosIds.includes(c.id))
-          .slice(0, 3); // Apenas 3 sugestões
-        setSugestoesVerdes(recomendacoes);
-      }
-
-      setWishlists(wishData || []);
-      setLoading(false);
-    };
-
     fetchData();
   }, [lang, isEn]);
+
+  // Gravação dos dados de perfil via modal de forma atómica
+  const handleSavePerfil = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingPerfil(true);
+
+    const { error } = await supabase
+      .from('perfis')
+      .update({
+        nome_completo: perfilForm.nome_completo,
+        nif: perfilForm.nif,
+        telefone: perfilForm.telefone,
+        contacto_emergencia: perfilForm.contacto_emergencia
+      })
+      .eq('id', perfilPai.id);
+
+    if (error) {
+      alert((isEn ? "Error updating profile: " : "Erro ao atualizar perfil: ") + error.message);
+    } else {
+      // Atualiza o estado local para esconder o bloco de avisos imediatamente
+      setPerfilPai((prev: any) => ({ ...prev, ...perfilForm }));
+      setDadosEmFalta(verificarFaltas(perfilForm));
+      setIsPerfilModalOpen(false);
+      alert(isEn ? "Profile details saved successfully." : "Dados guardados com sucesso.");
+    }
+    setSavingPerfil(false);
+  };
 
   const handlePagarRestante = async (reserva: any) => {
     setLoadingStripe(reserva.id);
@@ -152,24 +199,26 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
               <ul className="list-disc pl-5 text-amber-700 text-sm font-semibold mb-4">
                 {dadosEmFalta.map((falta, idx) => <li key={idx}>{falta}</li>)}
               </ul>
-              <Link href={`/${lang}/perfil`} className="inline-block bg-amber-600 hover:bg-amber-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm transition-colors shadow-sm">
+              {/* MODIFICAÇÃO: Abre a Lightbox em vez de redirecionar */}
+              <button 
+                onClick={() => setIsPerfilModalOpen(true)}
+                className="bg-amber-600 hover:bg-amber-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm transition-colors shadow-sm cursor-pointer"
+              >
                 {isEn ? 'Complete Profile Now' : 'Completar Perfil Agora'}
-              </Link>
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* MÓDULO DE SUGESTÕES LIMPO (Verde Escuro) */}
+      {/* MÓDULO DE SUGESTÕES LIMPO */}
       {sugestoesVerdes.length > 0 && (
         <div className="bg-emerald-50 border border-emerald-100 rounded-3xl p-8 mb-12 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-100 rounded-full blur-3xl opacity-50 -mr-20 -mt-20"></div>
-          
           <h2 className="text-2xl font-black text-emerald-900 mb-2 relative z-10">{isEn ? 'Suggested for You' : 'Sugestões de Verão'}</h2>
           <p className="text-emerald-700 font-medium text-sm mb-6 relative z-10 max-w-xl">
             {isEn ? 'Explore these highly-rated programs that you haven\'t booked yet.' : 'Explore estes programas altamente recomendados. Excluímos automaticamente as suas reservas atuais.'}
           </p>
-          
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 relative z-10">
             {sugestoesVerdes.map(sug => (
               <Link key={sug.id} href={`/${lang}/campo/${sug.id}`} className="bg-white rounded-2xl p-3 border border-emerald-100 hover:border-emerald-300 hover:shadow-md transition-all group flex items-center gap-3">
@@ -187,9 +236,7 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
       {/* SECÇÃO 1: RESERVAS */}
       {reservas.length === 0 ? (
         <div className="text-center p-12 sm:p-20 bg-white border-2 border-dashed border-slate-300 rounded-3xl mb-12">
-          <p className="text-slate-500 text-lg mb-6 font-medium">
-            {isEn ? 'No camp enrollments found yet.' : 'Ainda não inscreveu nenhum participante em programas de férias.'}
-          </p>
+          <p className="text-slate-500 text-lg mb-6 font-medium">{isEn ? 'No camp enrollments found yet.' : 'Ainda não inscreveu nenhum participante em programas de férias.'}</p>
           <Link href={`/${lang}/pesquisa`} className="inline-block bg-slate-900 text-white px-8 py-3.5 rounded-xl font-bold shadow-sm hover:bg-slate-800 transition-colors">
             {isEn ? 'Browse Camps' : 'Encontrar Programas'}
           </Link>
@@ -211,11 +258,10 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
             return (
               <div key={reserva.id} className="group flex flex-col bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm relative transition-all duration-300 hover:shadow-xl">
                 
-                {/* BOTÃO QUE ABRE O MODAL EM VEZ DE MUDAR DE PÁGINA */}
                 <button 
                   onClick={() => setReservaModal(reserva)} 
-                  className="absolute inset-0 z-10 w-full h-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-inset"
-                  aria-label={isEn ? 'View Booking Details' : 'Ver Detalhes da Inscrição'}
+                  className="absolute inset-0 z-10 w-full h-full cursor-pointer focus:outline-none"
+                  aria-label="Ver Detalhes"
                 />
                 
                 <div className={`h-48 w-full relative overflow-hidden bg-slate-100 ${isReembolsada ? 'grayscale' : ''}`}>
@@ -250,7 +296,6 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
                   </div>
                 </div>
 
-                {/* PAINEL FINANCEIRO DE AÇÃO NO DASHBOARD (Aumenta o z-index para ser clicável) */}
                 <div className="px-6 pb-6 relative z-30">
                   {isReembolsada ? (
                     <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-center">
@@ -276,7 +321,7 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
                     </div>
                   ) : isPendente ? (
                     <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center">
-                      <span className="text-xs font-black uppercase tracking-widest text-slate-500">⏳ A aguardar pagamento / Abandono</span>
+                      <span className="text-xs font-black uppercase tracking-widest text-slate-500">⏳ Pagamento Pendente</span>
                     </div>
                   ) : null}
                 </div>
@@ -289,44 +334,75 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
       {/* SECÇÃO 2: WISHLISTS */}
       <div>
         <h2 className="text-2xl font-black text-slate-900 mb-6">{isEn ? 'Your Wishlists' : 'As Suas Listas de Férias'}</h2>
-        
         {wishlists.length === 0 ? (
           <p className="text-slate-500 font-medium text-sm">{isEn ? 'You have no saved lists yet. Tap the heart on any camp to create one!' : 'Ainda não tem listas. Clique no coração em qualquer campo para começar!'}</p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-            {wishlists.map((lista) => {
-              return (
-                <div key={lista.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between h-40 relative group">
-                  <div>
-                    <h3 className="font-black text-slate-900 text-lg mb-1">{lista.nome}</h3>
-                  </div>
-                  
-                  <div className="flex justify-between items-center mt-4">
-                    <Link href={`/${lang}/lista/${lista.token_partilha}`} className="text-sm font-bold text-emerald-600 hover:text-emerald-700">
-                      {isEn ? 'View list' : 'Ver lista'} &rarr;
-                    </Link>
-                    
-                    <button 
-                      onClick={() => abrirModalPartilha(lista.token_partilha, lista.nome)}
-                      title={isEn ? "Share List" : "Partilhar Lista"}
-                      className="w-8 h-8 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-colors"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
-                    </button>
-                  </div>
+            {wishlists.map((lista) => (
+              <div key={lista.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between h-40 relative group">
+                <div>
+                  <h3 className="font-black text-slate-900 text-lg mb-1">{lista.nome}</h3>
                 </div>
-              );
-            })}
+                <div className="flex justify-between items-center mt-4">
+                  <Link href={`/${lang}/lista/${lista.token_partilha}`} className="text-sm font-bold text-emerald-600 hover:text-emerald-700">{isEn ? 'View list' : 'Ver lista'} &rarr;</Link>
+                  <button onClick={() => abrirModalPartilha(lista.token_partilha, lista.nome)} className="w-8 h-8 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-900 hover:text-white transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
+
+      {/* LIGHTBOX: COMPLETAR PERFIL (DADOS EN ENCARREGADO / FATURAÇÃO) */}
+      {isPerfilModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm transition-opacity" onClick={() => setIsPerfilModalOpen(false)}>
+          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col transform transition-transform" onClick={e => e.stopPropagation()}>
+            
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+              <div>
+                <h3 className="font-black text-slate-900 text-xl m-0">{isEn ? 'Complete Profile' : 'Dados do Encarregado'}</h3>
+                <p className="text-xs text-slate-500 mt-1 mb-0">{isEn ? 'Fill in missing details for camps logistical security.' : 'Preencha as informações obrigatórias exigidas.'}</p>
+              </div>
+              <button onClick={() => setIsPerfilModalOpen(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-white border border-slate-200 text-slate-500 hover:bg-slate-900 hover:text-white transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              </button>
+            </div>
+
+            <form onSubmit={handleSavePerfil} className="p-6 flex flex-col gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">{isEn ? 'Full Name' : 'Nome Completo Encarregado'}</label>
+                <input type="text" required value={perfilForm.nome_completo} onChange={e => setPerfilForm({...perfilForm, nome_completo: e.target.value})} className="w-full p-3 border border-slate-200 rounded-xl text-sm text-slate-900 outline-none focus:border-emerald-500 bg-slate-50" />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">{isEn ? 'Tax ID / NIF' : 'NIF (Para Emissão de Faturas)'}</label>
+                <input type="text" required value={perfilForm.nif} onChange={e => setPerfilForm({...perfilForm, nif: e.target.value})} className="w-full p-3 border border-slate-200 rounded-xl text-sm text-slate-900 outline-none focus:border-emerald-500 bg-slate-50" />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">{isEn ? 'Phone Number' : 'Telemóvel Contacto Direto'}</label>
+                <input type="tel" required value={perfilForm.telefone} onChange={e => setPerfilForm({...perfilForm, telefone: e.target.value})} className="w-full p-3 border border-slate-200 rounded-xl text-sm text-slate-900 outline-none focus:border-emerald-500 bg-slate-50" />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">{isEn ? 'Emergency Contact' : 'Contacto de Emergência Alternativo'}</label>
+                <input type="tel" required value={perfilForm.contacto_emergencia} onChange={e => setPerfilForm({...perfilForm, contacto_emergencia: e.target.value})} className="w-full p-3 border border-slate-200 rounded-xl text-sm text-slate-900 outline-none focus:border-emerald-500 bg-slate-50" placeholder="Ex: Contacto dos Avós / Cônjuge" />
+              </div>
+
+              <button type="submit" disabled={savingPerfil} className="w-full p-3.5 bg-slate-900 hover:bg-emerald-600 text-white font-bold rounded-xl text-sm transition-colors mt-2 disabled:opacity-50 cursor-pointer">
+                {savingPerfil ? (isEn ? 'Saving data...' : 'A gravar dados...') : (isEn ? 'Save and Update Profile' : 'Gravar e Atualizar Perfil')}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* MODAL DETALHADO DA RESERVA */}
       {reservaModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm transition-opacity" onClick={() => setReservaModal(null)}>
           <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
-            
-            {/* Header Modal */}
             <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
               <div>
                 <h3 className="font-black text-slate-900 text-xl m-0">{isEn ? 'Booking Summary' : 'Resumo da Inscrição'}</h3>
@@ -337,17 +413,13 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
               </button>
             </div>
             
-            {/* Corpo Modal */}
             <div className="p-6 overflow-y-auto bg-white flex flex-col gap-8">
-              
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {/* Coluna 1: O Programa */}
                 <div>
                   <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4">{isEn ? 'Program Details' : 'O Programa'}</h4>
                   <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
                     <p className="text-lg font-black text-slate-900 mb-1 leading-tight">{isEn && reservaModal.campos?.nome_en ? reservaModal.campos?.nome_en : reservaModal.campos?.nome}</p>
                     <p className="text-sm font-bold text-slate-500 mb-4">📍 {isEn && reservaModal.campos?.local_en ? reservaModal.campos?.local_en : reservaModal.campos?.local}</p>
-                    
                     <div className="border-t border-slate-200 pt-3">
                       <p className="text-xs font-bold text-slate-500 uppercase mb-1">{isEn ? 'Shift/Dates' : 'Turno Selecionado'}</p>
                       <p className="text-sm font-bold text-slate-900">{reservaModal.turno_nome}</p>
@@ -355,7 +427,6 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
                   </div>
                 </div>
 
-                {/* Coluna 2: O Participante */}
                 <div>
                   <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-4">{isEn ? 'Participant Info' : 'O Participante'}</h4>
                   <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100">
@@ -366,7 +437,6 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
                         <p className="text-xs font-bold text-emerald-700">NIF: {reservaModal.criancas?.nif || 'Não preenchido'}</p>
                       </div>
                     </div>
-                    
                     <div className="grid grid-cols-2 gap-2 text-sm border-t border-emerald-200/50 pt-3">
                       <div>
                         <span className="block text-[10px] font-bold text-emerald-600/70 uppercase">{isEn ? 'Allergies' : 'Alergias'}</span>
@@ -381,7 +451,6 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
                 </div>
               </div>
 
-              {/* Extras e Formulário */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {reservaModal.extras_escolhidos && Object.keys(reservaModal.extras_escolhidos).length > 0 && (
                   <div>
@@ -410,7 +479,6 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
                 )}
               </div>
 
-              {/* Resumo Financeiro */}
               <div className="bg-slate-900 rounded-2xl p-6 text-white mt-auto">
                 <div className="flex justify-between items-center mb-4">
                   <span className="text-sm font-bold text-slate-400 uppercase tracking-widest">{isEn ? 'Financial Status' : 'Situação Financeira'}</span>
@@ -431,7 +499,6 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
                   </div>
                 </div>
               </div>
-
             </div>
           </div>
         </div>
@@ -444,9 +511,7 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
               <h3 className="font-black text-slate-900 text-xl mb-6">Partilhar Ligação</h3>
               <div className="flex gap-4">
                 <input type="text" readOnly value={shareUrl} className="flex-1 bg-slate-100 p-3 rounded-xl text-sm text-slate-500 border border-slate-200 outline-none" />
-                <button onClick={handleCopyLink} className="bg-slate-900 text-white font-bold px-6 py-3 rounded-xl whitespace-nowrap">
-                  {copied ? 'Copiado!' : 'Copiar'}
-                </button>
+                <button onClick={handleCopyLink} className="bg-slate-900 text-white font-bold px-6 py-3 rounded-xl whitespace-nowrap">{copied ? 'Copiado!' : 'Copiar'}</button>
               </div>
            </div>
         </div>
