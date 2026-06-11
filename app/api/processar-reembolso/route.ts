@@ -5,6 +5,18 @@ import { Resend } from 'resend';
 
 export const dynamic = 'force-dynamic';
 
+const calcularIdade = (dataNasc: string) => {
+  if (!dataNasc) return 'N/A';
+  const hoje = new Date();
+  const nasc = new Date(dataNasc);
+  let idade = hoje.getFullYear() - nasc.getFullYear();
+  const m = hoje.getMonth() - nasc.getMonth();
+  if (m < 0 || (m === 0 && hoje.getDate() < nasc.getDate())) {
+    idade--;
+  }
+  return `${idade} anos`;
+};
+
 export async function POST(req: Request) {
   const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
   const resendApiKey = process.env.RESEND_API_KEY;
@@ -22,15 +34,10 @@ export async function POST(req: Request) {
   try {
     const { reservaId } = await req.json();
 
-    // 1. Ir buscar todos os detalhes gigantes da reserva
+    // CORREÇÃO LOGÍSTICA: Busca direta e linear para evitar falhas de ambiguidade nas Foreign Keys do Supabase
     const { data: reserva, error: fetchError } = await supabase
       .from('reservas')
-      .select(`
-        *,
-        campos ( nome, local ),
-        criancas ( nome ),
-        perfis:cliente_id ( nome_completo, email )
-      `)
+      .select('*')
       .eq('id', reservaId)
       .single();
 
@@ -42,6 +49,11 @@ export async function POST(req: Request) {
       throw new Error("Esta reserva já se encontra reembolsada.");
     }
 
+    // Procura os dados complementares em consultas planas e seguras
+    const { data: campoData } = await supabase.from('campos').select('nome, local').eq('id', reserva.campo_id).single();
+    const { data: criancaData } = await supabase.from('criancas').select('nome').eq('id', reserva.crianca_id).single();
+    const { data: clienteData } = await supabase.from('perfis').select('nome_completo, email').eq('id', reserva.cliente_id).single();
+
     // 2. Procurar o organizador para saber se houve Split Payment (Stripe Connect)
     const { data: orgData } = await supabase
       .from('perfis')
@@ -49,7 +61,7 @@ export async function POST(req: Request) {
       .eq('id', reserva.organizador_id)
       .single();
 
-    // 3. Procurar na Stripe a transação que pagou esta reserva (agrupadas em reservasIds)
+    // 3. Procurar na Stripe a transação correspondente
     const sessions = await stripe.checkout.sessions.list({ limit: 100 });
     const matchSession = sessions.data.find(s => {
       if (s.metadata && s.metadata.reservasIds) {
@@ -65,8 +77,7 @@ export async function POST(req: Request) {
       throw new Error("Transação Stripe não encontrada para emitir reembolso automático. Terá de reembolsar manualmente.");
     }
 
-    // 4. EXECUTAR REEMBOLSO NA STRIPE
-    // Como a Stripe cobra o total agrupado, vamos reembolsar apenas a quantia exata desta reserva.
+    // 4. EXECUTAR REEMBOLSO NA STRIPE WITH CONNECT PROTECTION
     const quantiaReembolsoCentimos = Math.round(Number(reserva.valor_total) * 100);
     
     const refundParams: Stripe.RefundCreateParams = {
@@ -75,7 +86,6 @@ export async function POST(req: Request) {
       reason: 'requested_by_customer'
     };
 
-    // A proteção inteligente: só faz reverse transfer se a transação original foi dividida
     if (orgData?.stripe_account_id) {
       refundParams.reverse_transfer = true;
       refundParams.refund_application_fee = true;
@@ -86,22 +96,21 @@ export async function POST(req: Request) {
     // 5. ATUALIZAR A BASE DE DADOS PARA REFLETIR O REEMBOLSO
     await supabase.from('reservas').update({
       status_pagamento: 'Reembolsado',
-      status_reembolso: 'Processado Automaticamente',
+      status_reembolso: 'Reembolsado',
+      status: 'Reembolsado',
       dados_reembolso: { data_estorno: new Date().toISOString(), processado_por: 'SuperAdmin HQ' }
     }).eq('id', reservaId);
 
-    // 6. DISPARAR OS 3 EMAILS B2B COM A NOTÍCIA
-    
-    // Tratamento seguro de arrays da resposta do Supabase
-    const campoNome = Array.isArray(reserva.campos) ? reserva.campos[0]?.nome : reserva.campos?.nome || 'Programa HelloCamp';
-    const nomePai = Array.isArray(reserva.perfis) ? reserva.perfis[0]?.nome_completo : reserva.perfis?.nome_completo || 'Cliente';
-    const emailPai = Array.isArray(reserva.perfis) ? reserva.perfis[0]?.email : reserva.perfis?.email;
-    const nomeCrianca = Array.isArray(reserva.criancas) ? reserva.criancas[0]?.nome : reserva.criancas?.nome || 'Participante';
+    // 6. DISPARAR OS EMAILS DE NOTIFICAÇÃO COMPLETA
+    const campoNome = campoData?.nome || 'Programa HelloCamp';
+    const nomePai = clienteData?.nome_completo || 'Encarregado de Educação';
+    const emailPai = clienteData?.email || matchSession.customer_email || matchSession.customer_details?.email;
+    const nomeCrianca = criancaData?.nome || 'Participante';
     const valorReembolsado = Number(reserva.valor_total).toFixed(2);
     
     const emailCampo = orgData?.email || 'info@hellocamp.pt';
 
-    // EMAIL A. PARA O PAI
+    // A. Email para o Pai
     if (emailPai) {
       await resend.emails.send({
         from: 'HelloCamp Finanças <info@hellocamp.pt>',
@@ -121,13 +130,13 @@ export async function POST(req: Request) {
                 <tr><td style="padding: 5px 0; border-top: 2px solid #e2e8f0; padding-top: 10px; margin-top: 10px;">Valor Estornado:</td><td style="text-align: right; font-weight: bold; color: #059669; font-size: 18px; border-top: 2px solid #e2e8f0; padding-top: 10px; margin-top: 10px;">${valorReembolsado}€</td></tr>
               </table>
             </div>
-            <p style="font-size: 13px; color: #64748b;">O valor será devolvido à sua conta bancária/cartão através da mesma via utilizada para pagamento. O processamento bancário pode demorar entre 5 a 10 dias úteis dependendo da sua entidade.</p>
+            <p style="font-size: 13px; color: #64748b;">O valor será devolvido através da mesma via utilizada para pagamento. O processamento bancário pode demorar entre 5 a 10 dias úteis.</p>
           </div>
         `
       });
     }
 
-    // EMAIL B. PARA O PARCEIRO/ORGANIZADOR
+    // B. Email para o Organizador
     await resend.emails.send({
       from: 'HelloCamp Parceiros <info@hellocamp.pt>',
       to: emailCampo,
@@ -142,26 +151,16 @@ export async function POST(req: Request) {
             <p><strong>Encarregado:</strong> ${nomePai}</p>
             <p style="color: #b91c1c;"><strong>Valor Devolvido:</strong> ${valorReembolsado}€</p>
           </div>
-          <p style="font-size: 12px; color: #64748b; margin-top: 20px;">Esta vaga encontra-se novamente livre para venda na plataforma. A comissão faturada será revertida no fecho de contas.</p>
         </div>
       `
     });
 
-    // EMAIL C. PARA A HELLOCAMP (CONTROLO INTERNO)
+    // C. Email para a Direção HelloCamp
     await resend.emails.send({
       from: 'HelloCamp Control <info@hellocamp.pt>',
       to: 'info@hellocamp.pt',
       subject: `[REEMBOLSO BANCÁRIO] - ${valorReembolsado}€ devolvidos`,
-      html: `
-        <div style="font-family: monospace; padding: 20px;">
-          <h2>Alerta de Tesouraria</h2>
-          <p>Reembolso automático concluído via Stripe API.</p>
-          <p><strong>Valor Reembolsado:</strong> ${valorReembolsado}€</p>
-          <p><strong>Ref Reserva:</strong> ${reservaId}</p>
-          <p><strong>Cliente:</strong> ${nomePai}</p>
-          <p><strong>Proteção de Capital:</strong> ${orgData?.stripe_account_id ? 'Sim (Reverse Transfer ativado)' : 'Não aplicável (Não houve split payment original)'}</p>
-        </div>
-      `
+      html: `<div style="font-family: monospace; padding: 20px;"><h2>Alerta de Tesouraria</h2><p>Reembolso automático concluído via Stripe API.</p><p><strong>Valor Reembolsado:</strong> ${valorReembolsado}€</p><p><strong>Ref Reserva:</strong> ${reservaId}</p><p><strong>Cliente:</strong> ${nomePai}</p></div>`
     });
 
     return NextResponse.json({ success: true, message: 'Reembolso efetuado e comunicados enviados.' });
