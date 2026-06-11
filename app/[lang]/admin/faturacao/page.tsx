@@ -34,9 +34,10 @@ export default function FaturacaoPage({ params }: { params: Promise<{ lang: stri
       const { data: reservasData } = await supabase
         .from('reservas')
         .select(`
-          id, created_at, valor_total, status_pagamento, turno_nome, campo_id,
+          id, created_at, valor_total, status_pagamento, turno_nome, campo_id, metodo_pagamento, status_reembolso, nome_encarregado, email_encarregado,
           campos ( nome, preco, taxa_comissao, base_comissao ),
-          criancas ( nome )
+          criancas ( nome ),
+          perfis:cliente_id ( nome_completo, nif )
         `)
         .eq('organizador_id', session.user.id)
         .order('created_at', { ascending: false });
@@ -56,19 +57,12 @@ export default function FaturacaoPage({ params }: { params: Promise<{ lang: stri
       const response = await fetch('/api/stripe-connect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: session.user.id,
-          email: session.user.email,
-          lang: lang
-        })
+        body: JSON.stringify({ userId: session.user.id, email: session.user.email, lang: lang })
       });
 
       const data = await response.json();
-      if (data.url) {
-        window.location.href = data.url; 
-      } else {
-        alert((isEn ? "Stripe connection error: " : "Erro ao conectar com a Stripe: ") + data.error);
-      }
+      if (data.url) window.location.href = data.url; 
+      else alert((isEn ? "Stripe connection error: " : "Erro ao conectar com a Stripe: ") + data.error);
     } catch (err: any) {
       alert((isEn ? "Technical error: " : "Erro técnico: ") + err.message);
     }
@@ -92,7 +86,7 @@ export default function FaturacaoPage({ params }: { params: Promise<{ lang: stri
     setSaving(false);
   };
 
-  if (loading) return <div style={{ padding: '4rem', textAlign: 'center', fontWeight: 'bold', color: '#64748b' }}>{isEn ? 'Loading financial data...' : 'A carregar dados financeiros e comissões...'}</div>;
+  if (loading) return <div style={{ padding: '4rem', textAlign: 'center', fontWeight: 'bold', color: '#64748b' }}>{isEn ? 'Loading financial data...' : 'A carregar dados financeiros e faturas...'}</div>;
 
   const reservasAtivas = filtroCampoId === 'todos' ? reservasFull : reservasFull.filter(r => r.campo_id === filtroCampoId);
 
@@ -105,29 +99,45 @@ export default function FaturacaoPage({ params }: { params: Promise<{ lang: stri
 
   const historicoCalculado = reservasAtivas.map(res => {
     const valorReserva = Number(res.valor_total) || 0;
-    if (res.status_pagamento !== 'Reembolsado') {
+    const isReembolsado = res.status_pagamento === 'Reembolsado';
+
+    if (!isReembolsado) {
       totalVolume += valorReserva;
     }
 
-    const taxaLinha = (res.campos?.taxa_comissao !== null && res.campos?.taxa_comissao !== undefined) ? Number(res.campos.taxa_comissao) : Number(taxaComissaoGeral);
-    const baseLinha = res.campos?.base_comissao || baseIncidenciaGeral;
+    const campoAssociado = Array.isArray(res.campos) ? res.campos[0] : res.campos;
+    const taxaLinha = (campoAssociado?.taxa_comissao !== null && campoAssociado?.taxa_comissao !== undefined) ? Number(campoAssociado.taxa_comissao) : Number(taxaComissaoGeral);
+    const baseLinha = campoAssociado?.base_comissao || baseIncidenciaGeral;
 
     let valorIncidencia = valorReserva;
     if (baseLinha === 'apenas_programa') {
-      const precoBase = Number(res.campos?.preco) || valorReserva;
+      const precoBase = Number(campoAssociado?.preco) || valorReserva;
       valorIncidencia = Math.min(valorReserva, precoBase);
     } else if (baseLinha === 'sem_comissao') {
       valorIncidencia = 0;
     }
 
-    const valorComissao = res.status_pagamento === 'Reembolsado' ? 0 : valorIncidencia * (taxaLinha / 100);
+    const valorComissao = isReembolsado ? 0 : valorIncidencia * (taxaLinha / 100);
     
-    if (res.status_pagamento !== 'Reembolsado') {
+    if (!isReembolsado) {
       totalComissoesGeradas += valorComissao;
       saldoParceiroSeraTransferido += (valorReserva - valorComissao);
     }
 
-    return { ...res, valorIncidencia, valorComissao, taxaAplicada: taxaLinha, baseAplicada: baseLinha };
+    // Detalhes Pai e Filho
+    const perfilPai = Array.isArray(res.perfis) ? res.perfis[0] : res.perfis;
+    const criancaInfo = Array.isArray(res.criancas) ? res.criancas[0] : res.criancas;
+
+    return { 
+      ...res, 
+      valorIncidencia, 
+      valorComissao, 
+      taxaAplicada: taxaLinha, 
+      baseAplicada: baseLinha,
+      campoFormatado: campoAssociado,
+      paiFormatado: perfilPai,
+      criancaFormatado: criancaInfo
+    };
   });
 
   const campoFiltradoData = filtroCampoId !== 'todos' ? camposParceiro.find(c => c.id === filtroCampoId) : null;
@@ -141,10 +151,10 @@ export default function FaturacaoPage({ params }: { params: Promise<{ lang: stri
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '2.5rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h1 style={{ fontSize: '2rem', fontWeight: '900', color: '#0f172a', margin: 0 }}>
-            {isEn ? 'Billing & Automated Payouts' : 'Faturação e Recebimentos Automáticos'}
+            {isEn ? 'Billing & Automated Payouts' : 'Faturação e Pagamentos'}
           </h1>
           <p style={{ color: '#64748b', marginTop: '0.5rem', fontSize: '15px' }}>
-            {isEn ? 'Track splits, manage company info and connect your bank account via Stripe.' : 'Controle a divisão de valores, faturas e sincronize o seu banco de forma automatizada.'}
+            {isEn ? 'Track splits, manage company info and connect your bank account via Stripe.' : 'Controle a divisão de valores e sincronize o seu banco para receber o dinheiro.'}
           </p>
         </div>
 
@@ -200,7 +210,7 @@ export default function FaturacaoPage({ params }: { params: Promise<{ lang: stri
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem', marginBottom: '2.5rem' }}>
         <div style={{ backgroundColor: 'white', padding: '1.5rem', borderRadius: '1rem', border: '1px solid #e2e8f0' }}>
-          <p style={{ fontSize: '12px', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', marginBottom: '0.5rem' }}>{isEn ? 'Net Volume' : 'Volume Total Transacionado'}</p>
+          <p style={{ fontSize: '12px', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', marginBottom: '0.5rem' }}>{isEn ? 'Gross Volume' : 'Volume Bruto Processado'}</p>
           <p style={{ fontSize: '2rem', fontWeight: '900', color: '#0f172a', margin: 0 }}>{totalVolume.toFixed(2)}€</p>
         </div>
 
@@ -211,7 +221,7 @@ export default function FaturacaoPage({ params }: { params: Promise<{ lang: stri
 
         <div style={{ backgroundColor: '#ecfdf5', padding: '1.5rem', borderRadius: '1rem', border: '1px solid #10b981' }}>
           <p style={{ fontSize: '12px', fontWeight: 'bold', color: '#065f46', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
-            {isEn ? 'Your Net Balance' : 'O Seu Ganho Líquido Transferido'}
+            {isEn ? 'Your Net Balance' : 'O Seu Ganho Líquido'}
           </p>
           <p style={{ fontSize: '2rem', fontWeight: '900', color: '#059669', margin: 0 }}>
             {saldoParceiroSeraTransferido.toFixed(2)}€
@@ -220,7 +230,6 @@ export default function FaturacaoPage({ params }: { params: Promise<{ lang: stri
       </div>
 
       <div style={{ display: 'grid', gap: '2rem', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', marginBottom: '2.5rem', alignItems: 'start' }}>
-        
         <div style={cardStyle}>
           <h2 style={cardTitleStyle}>{isEn ? 'Company Details' : 'Dados Fiscais da Empresa'}</h2>
           <form onSubmit={handleSaveDetails} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -269,11 +278,10 @@ export default function FaturacaoPage({ params }: { params: Promise<{ lang: stri
             </div>
           </div>
         </div>
-
       </div>
 
       <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '1.25rem', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
-        <h2 style={cardTitleStyle}>{isEn ? 'Transaction History' : 'Histórico de Transações e Comissões'}</h2>
+        <h2 style={cardTitleStyle}>{isEn ? 'Transaction History' : 'Histórico de Transações'}</h2>
         
         {historicoCalculado.length === 0 ? (
           <div style={{ padding: '3rem', textAlign: 'center', color: '#64748b', backgroundColor: '#f8fafc', borderRadius: '0.75rem', border: '1px dashed #cbd5e1' }}>
@@ -285,36 +293,50 @@ export default function FaturacaoPage({ params }: { params: Promise<{ lang: stri
               <thead>
                 <tr style={{ borderBottom: '2px solid #e2e8f0', color: '#64748b' }}>
                   <th style={{ padding: '1rem', fontWeight: 'bold' }}>{isEn ? 'Date' : 'Data'}</th>
-                  <th style={{ padding: '1rem', fontWeight: 'bold' }}>{isEn ? 'Camp / Child' : 'Campo / Criança'}</th>
+                  <th style={{ padding: '1rem', fontWeight: 'bold' }}>{isEn ? 'Program / Child' : 'Programa / Criança'}</th>
+                  <th style={{ padding: '1rem', fontWeight: 'bold' }}>{isEn ? 'Parent / Contact' : 'Encarregado / NIF'}</th>
                   <th style={{ padding: '1rem', fontWeight: 'bold' }}>{isEn ? 'Gross Value' : 'Valor Total'}</th>
-                  <th style={{ padding: '1rem', fontWeight: 'bold', color: '#ef4444' }}>{isEn ? 'Commission' : 'Comissão'}</th>
-                  <th style={{ padding: '1rem', fontWeight: 'bold' }}>{isEn ? 'Status' : 'Pagamento Cliente'}</th>
+                  <th style={{ padding: '1rem', fontWeight: 'bold', color: '#ef4444' }}>{isEn ? 'HQ Commission' : 'Comissão'}</th>
+                  <th style={{ padding: '1rem', fontWeight: 'bold' }}>{isEn ? 'Status' : 'Estado'}</th>
                 </tr>
               </thead>
               <tbody>
-                {historicoCalculado.map((res) => (
-                  <tr key={res.id} style={{ borderBottom: '1px solid #f1f5f9', backgroundColor: res.status_pagamento === 'Reembolsado' ? '#fecaca10' : 'transparent' }}>
-                    <td style={{ padding: '1rem', color: '#475569' }}>{new Date(res.created_at).toLocaleDateString()}</td>
-                    <td style={{ padding: '1rem' }}>
-                      <div style={{ fontWeight: 'bold', color: '#0f172a' }}>{res.campos?.nome}</div>
-                      <div style={{ fontSize: '12px', color: '#64748b' }}>{res.criancas?.nome} ({res.turno_nome})</div>
-                    </td>
-                    <td style={{ padding: '1rem', fontWeight: 'bold' }}>{res.valor_total}€</td>
-                    <td style={{ padding: '1rem', fontWeight: 'bold', color: res.status_pagamento === 'Reembolsado' ? '#94a3b8' : '#ef4444' }}>
-                      {res.status_pagamento === 'Reembolsado' ? '0.00€' : `${res.valorComissao.toFixed(2)}€`}
-                      <span style={{ display: 'block', fontSize: '10px', color: '#94a3b8', fontWeight: 'normal' }}>({res.taxaAplicada}%)</span>
-                    </td>
-                    <td style={{ padding: '1rem' }}>
-                      <span style={{ 
-                        padding: '0.25rem 0.75rem', borderRadius: '999px', fontSize: '12px', fontWeight: 'bold',
-                        backgroundColor: res.status_pagamento === 'Pago' ? '#ecfdf5' : (res.status_pagamento === 'Reembolsado' ? '#fef2f2' : '#fef3c7'),
-                        color: res.status_pagamento === 'Pago' ? '#059669' : (res.status_pagamento === 'Reembolsado' ? '#ef4444' : '#b45309')
-                      }}>
-                        {res.status_pagamento === 'Pago' ? (isEn ? 'Paid' : 'Pago') : (res.status_pagamento === 'Reembolsado' ? (isEn ? 'Refunded' : 'Reembolsado') : (isEn ? 'Pending' : 'Pendente'))}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+                {historicoCalculado.map((res) => {
+                  const eReembolsado = res.status_pagamento === 'Reembolsado';
+                  const nomePai = res.nome_encarregado || res.paiFormatado?.nome_completo || 'N/D';
+                  const nifPai = res.nif_encarregado || res.paiFormatado?.nif || 'S/ NIF';
+
+                  return (
+                    <tr key={res.id} style={{ borderBottom: '1px solid #f1f5f9', opacity: eReembolsado ? 0.6 : 1 }}>
+                      <td style={{ padding: '1rem', color: '#475569' }}>
+                        {new Date(res.created_at).toLocaleDateString()}
+                        <div style={{ fontSize: '11px', fontWeight: 'bold', marginTop: '4px' }}>{res.metodo_pagamento || 'N/A'}</div>
+                      </td>
+                      <td style={{ padding: '1rem' }}>
+                        <div style={{ fontWeight: 'bold', color: '#0f172a' }}>{res.campoFormatado?.nome}</div>
+                        <div style={{ fontSize: '12px', color: '#64748b' }}>👦 {res.criancaFormatado?.nome} ({res.turno_nome})</div>
+                      </td>
+                      <td style={{ padding: '1rem' }}>
+                        <div style={{ fontWeight: 'bold', color: '#334155' }}>{nomePai}</div>
+                        <div style={{ fontSize: '11px', color: '#64748b' }}>NIF: {nifPai}</div>
+                      </td>
+                      <td style={{ padding: '1rem', fontWeight: 'bold' }}>{res.valor_total}€</td>
+                      <td style={{ padding: '1rem', fontWeight: 'bold', color: eReembolsado ? '#94a3b8' : '#ef4444' }}>
+                        {eReembolsado ? 'Anulada' : `${res.valorComissao.toFixed(2)}€`}
+                        {!eReembolsado && <span style={{ display: 'block', fontSize: '10px', color: '#94a3b8', fontWeight: 'normal' }}>({res.taxaAplicada}%)</span>}
+                      </td>
+                      <td style={{ padding: '1rem' }}>
+                        <span style={{ 
+                          padding: '0.25rem 0.75rem', borderRadius: '999px', fontSize: '11px', fontWeight: '900', textTransform: 'uppercase',
+                          backgroundColor: eReembolsado ? '#fef2f2' : (res.status_pagamento === 'Pago' || res.status_pagamento === 'Sinal Pago' ? '#ecfdf5' : '#f1f5f9'),
+                          color: eReembolsado ? '#ef4444' : (res.status_pagamento === 'Pago' || res.status_pagamento === 'Sinal Pago' ? '#059669' : '#64748b')
+                        }}>
+                          {res.status_pagamento || 'Pendente'}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

@@ -31,18 +31,15 @@ export default function DashboardMarketing({ params }: { params: Promise<{ lang:
 
       const userId = session.user.id;
 
-      // 1. Busca Perfil (Total Prioridade ao Nome da Empresa)
-      const { data: perfil } = await supabase.from('perfis').select('empresa_nome, nome_completo').eq('id', userId).single();
+      // 1. Busca Perfil (Incluindo verificação Stripe)
+      const { data: perfil } = await supabase.from('perfis').select('empresa_nome, nome_completo, stripe_account_id').eq('id', userId).single();
       
       if (perfil) {
-        // Se empresa_nome tem texto e não está vazio, é a prioridade #1
         if (perfil.empresa_nome && perfil.empresa_nome.trim() !== "") {
           setNomeEmpresa(perfil.empresa_nome);
         } else if (perfil.nome_completo && perfil.nome_completo.trim() !== "") {
-          // Fallback #2: Primeiro nome da pessoa
           setNomeEmpresa(perfil.nome_completo.split(' ')[0]);
         } else {
-          // Fallback #3: Desconhecido
           setNomeEmpresa(isEn ? "Organizer" : "Organizador");
         }
       } else {
@@ -59,24 +56,33 @@ export default function DashboardMarketing({ params }: { params: Promise<{ lang:
       let totalComReviews = 0;
       const novasSugestoes: any[] = [];
 
+      // ALERTA FINANCEIRO CRÍTICO (STRIPE)
+      if (!perfil?.stripe_account_id) {
+        novasSugestoes.push({ 
+          tipo: 'critical', 
+          icon: '🚨', 
+          titulo: isEn ? 'Bank Account Not Connected' : 'Conta Bancária Não Conectada',
+          texto: isEn ? `You must connect your Stripe account to receive payments from parents.` : `Precisa de ligar a sua conta bancária via Stripe. Enquanto não o fizer, não poderá receber o dinheiro das inscrições.`, 
+          link: `/${lang}/admin/faturacao`,
+          actionText: isEn ? 'Connect Now' : 'Ligar Conta Agora'
+        });
+      }
+
       campos?.forEach(c => {
-        // Contagem de Estado
         if (c.contrato_parceiro_url) ativos++;
         else pendentes++;
 
-        // Contagem de Reviews
         if (c.rating_score > 0) {
           somaEstrelas += c.rating_score;
           totalComReviews++;
         }
 
-        // MOTOR DE OTIMIZAÇÃO (O que falta para vender mais?)
         if (!c.contrato_parceiro_url) {
           novasSugestoes.push({ 
-            tipo: 'critical', 
-            icon: '🔴', 
-            titulo: isEn ? 'Contract Pending' : 'Contrato Pendente',
-            texto: isEn ? `The camp "${c.nome}" is hidden. Waiting for HelloCamp validation.` : `O campo "${c.nome}" está invisível. Aguarda validação da HelloCamp.`, 
+            tipo: 'warning', 
+            icon: '⏳', 
+            titulo: isEn ? 'Contract Pending' : 'Em Validação',
+            texto: isEn ? `The camp "${c.nome}" is hidden. Waiting for HelloCamp validation.` : `O campo "${c.nome}" está invisível e aguarda validação da equipa HelloCamp.`, 
             link: `/${lang}/admin/campos/editar/${c.id}`,
             actionText: isEn ? 'Check Status' : 'Ver Estado'
           });
@@ -176,55 +182,33 @@ export default function DashboardMarketing({ params }: { params: Promise<{ lang:
           </h2>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1.5rem' }}>
-            {/* Wishlists (O Funil de Desejo) */}
+            {/* Wishlists */}
             <div style={{ backgroundColor: 'white', padding: '1.5rem', borderRadius: '1.5rem', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
-                <div style={{ width: '3rem', height: '3rem', backgroundColor: '#fef2f2', color: '#ef4444', borderRadius: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem' }}>
-                  ❤️
-                </div>
-                <span style={{ fontSize: '11px', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  {isEn ? 'Wishlists' : 'Favoritos'}
-                </span>
+                <div style={{ width: '3rem', height: '3rem', backgroundColor: '#fef2f2', color: '#ef4444', borderRadius: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem' }}>❤️</div>
+                <span style={{ fontSize: '11px', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{isEn ? 'Wishlists' : 'Favoritos'}</span>
               </div>
-              <span style={{ fontSize: '2.5rem', fontWeight: '900', color: '#0f172a', display: 'block', lineHeight: 1 }}>
-                {metricas.vezesGuardado}
-              </span>
-              <p style={{ margin: '0.5rem 0 0 0', fontSize: '12px', color: '#64748b', fontWeight: '600' }}>
-                {isEn ? 'Times your camps were saved by parents.' : 'Vezes que os pais guardaram os seus campos.'}
-              </p>
+              <span style={{ fontSize: '2.5rem', fontWeight: '900', color: '#0f172a', display: 'block', lineHeight: 1 }}>{metricas.vezesGuardado}</span>
+              <p style={{ margin: '0.5rem 0 0 0', fontSize: '12px', color: '#64748b', fontWeight: '600' }}>{isEn ? 'Times your camps were saved.' : 'Vezes que guardaram os seus campos.'}</p>
             </div>
 
-            {/* Avaliações Globais */}
+            {/* Avaliações */}
             <div style={{ backgroundColor: 'white', padding: '1.5rem', borderRadius: '1.5rem', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
-                <div style={{ width: '3rem', height: '3rem', backgroundColor: '#fefce8', color: '#eab308', borderRadius: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem' }}>
-                  ⭐
-                </div>
-                <span style={{ fontSize: '11px', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  {isEn ? 'Global Rating' : 'Avaliação'}
-                </span>
+                <div style={{ width: '3rem', height: '3rem', backgroundColor: '#fefce8', color: '#eab308', borderRadius: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem' }}>⭐</div>
+                <span style={{ fontSize: '11px', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{isEn ? 'Global Rating' : 'Avaliação'}</span>
               </div>
-              <span style={{ fontSize: '2.5rem', fontWeight: '900', color: '#0f172a', display: 'block', lineHeight: 1 }}>
-                {metricas.mediaEstrelas > 0 ? metricas.mediaEstrelas.toFixed(1) : '-'}
-              </span>
-              <p style={{ margin: '0.5rem 0 0 0', fontSize: '12px', color: '#64748b', fontWeight: '600' }}>
-                {isEn ? 'Average score across all your camps.' : 'Média de todas as reviews publicadas.'}
-              </p>
+              <span style={{ fontSize: '2.5rem', fontWeight: '900', color: '#0f172a', display: 'block', lineHeight: 1 }}>{metricas.mediaEstrelas > 0 ? metricas.mediaEstrelas.toFixed(1) : '-'}</span>
+              <p style={{ margin: '0.5rem 0 0 0', fontSize: '12px', color: '#64748b', fontWeight: '600' }}>{isEn ? 'Average score.' : 'Média das reviews recebidas.'}</p>
             </div>
 
             {/* Total Inscritos */}
             <div style={{ backgroundColor: 'white', padding: '1.5rem', borderRadius: '1.5rem', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)', gridColumn: '1 / -1' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
-                <div style={{ width: '3rem', height: '3rem', backgroundColor: '#f0fdf4', color: '#10b981', borderRadius: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem' }}>
-                  🎫
-                </div>
-                <span style={{ fontSize: '11px', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  {isEn ? 'Total Bookings' : 'Total de Inscrições'}
-                </span>
+                <div style={{ width: '3rem', height: '3rem', backgroundColor: '#f0fdf4', color: '#10b981', borderRadius: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem' }}>🎫</div>
+                <span style={{ fontSize: '11px', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{isEn ? 'Total Bookings' : 'Total de Inscrições'}</span>
               </div>
-              <span style={{ fontSize: '2.5rem', fontWeight: '900', color: '#10b981', display: 'block', lineHeight: 1 }}>
-                {metricas.totalReservas}
-              </span>
+              <span style={{ fontSize: '2.5rem', fontWeight: '900', color: '#10b981', display: 'block', lineHeight: 1 }}>{metricas.totalReservas}</span>
             </div>
           </div>
 
@@ -246,7 +230,7 @@ export default function DashboardMarketing({ params }: { params: Promise<{ lang:
         <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '1.5rem', border: '1px solid #e2e8f0', boxShadow: '0 10px 15px -3px rgba(15,23,42,0.05)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
             <h2 style={{ fontSize: '1.25rem', fontWeight: '900', color: '#0f172a', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              {isEn ? 'Optimization Engine' : 'Motor de Conversão'}
+              {isEn ? 'Optimization Engine' : 'Motor de Otimização'}
             </h2>
             <span style={{ backgroundColor: sugestoes.length > 0 ? '#fef2f2' : '#f0fdf4', color: sugestoes.length > 0 ? '#ef4444' : '#10b981', padding: '0.25rem 0.75rem', borderRadius: '999px', fontSize: '12px', fontWeight: '900' }}>
               {sugestoes.length} {isEn ? 'Tasks' : 'Avisos'}
@@ -260,13 +244,12 @@ export default function DashboardMarketing({ params }: { params: Promise<{ lang:
                 {isEn ? 'All set!' : 'Tudo perfeito!'}
               </h3>
               <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
-                {isEn ? 'Your camps are fully optimized.' : 'Os seus campos estão otimizados ao máximo para converter reservas.'}
+                {isEn ? 'Your camps are fully optimized.' : 'A sua conta bancária está ligada e os campos estão bem configurados.'}
               </p>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {sugestoes.map((sug, idx) => {
-                // Cores dinâmicas com base no nível de alerta
                 let bgColor = '#f8fafc', borderColor = '#e2e8f0', titleColor = '#0f172a';
                 if (sug.tipo === 'critical') { bgColor = '#fef2f2'; borderColor = '#fecaca'; titleColor = '#991b1b'; }
                 if (sug.tipo === 'warning') { bgColor = '#fffbeb'; borderColor = '#fde68a'; titleColor = '#92400e'; }
@@ -276,13 +259,9 @@ export default function DashboardMarketing({ params }: { params: Promise<{ lang:
                   <div key={idx} style={{ padding: '1.25rem', borderRadius: '1rem', backgroundColor: bgColor, border: `1px solid ${borderColor}`, display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
                     <div style={{ fontSize: '1.5rem', lineHeight: 1 }}>{sug.icon}</div>
                     <div style={{ flex: 1 }}>
-                      <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '14px', fontWeight: '800', color: titleColor }}>
-                        {sug.titulo}
-                      </h4>
-                      <p style={{ margin: '0 0 1rem 0', fontSize: '13px', color: '#475569', lineHeight: 1.4 }}>
-                        {sug.texto}
-                      </p>
-                      <Link href={sug.link} style={{ display: 'inline-block', fontSize: '12px', fontWeight: '800', color: titleColor, textDecoration: 'underline', textUnderlineOffset: '4px' }}>
+                      <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '14px', fontWeight: '800', color: titleColor }}>{sug.titulo}</h4>
+                      <p style={{ margin: '0 0 1rem 0', fontSize: '13px', color: '#475569', lineHeight: 1.4 }}>{sug.texto}</p>
+                      <Link href={sug.link} style={{ display: 'inline-block', fontSize: '12px', fontWeight: '900', color: titleColor, textDecoration: 'underline', textUnderlineOffset: '4px' }}>
                         {sug.actionText} &rarr;
                       </Link>
                     </div>

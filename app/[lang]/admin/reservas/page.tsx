@@ -25,13 +25,13 @@ export default function GestaoReservasParceiro({ params }: { params: Promise<{ l
         .select(`
           id, nome, nome_en, vagas_totais, turnos, contrato_parceiro_url,
           reservas (
-            id, turno_nome, valor_total, created_at, extras_escolhidos, status_pagamento, respostas_customizadas,
+            id, turno_nome, valor_total, created_at, extras_escolhidos, status_pagamento, status_reembolso, respostas_customizadas, nome_encarregado, email_encarregado, telefone_encarregado, nif_encarregado,
             criancas (
               nome, nif, data_nascimento, sexo, restricoes_alimentares,
               tipo_sanguineo, doencas_cronicas, medicacao_regular, limitacoes_fisicas,
               sabe_nadar, sabe_andar_bicicleta, tamanho_tshirt
             ),
-            perfis (
+            perfis:cliente_id (
               nome_completo, email, telefone, nif, contacto_emergencia, pessoas_autorizadas_recolha
             )
           )
@@ -43,15 +43,20 @@ export default function GestaoReservasParceiro({ params }: { params: Promise<{ l
           const dataOrdenacao = c.turnos && c.turnos[0]?.data_inicio ? c.turnos[0].data_inicio : '9999-12-31';
           
           const inscritos = (c.reservas || []).map((reserva: any) => {
-            // LÓGICA DE ABANDONO: Verifica se já passaram 15 minutos e não foi paga
             const dataReserva = new Date(reserva.created_at).getTime();
             const agora = new Date().getTime();
             const minutosPassados = (agora - dataReserva) / (1000 * 60);
 
             let statusCalculado = reserva.status_pagamento || 'Pendente';
-            if (statusCalculado === 'Pendente' && minutosPassados > 15) {
-              statusCalculado = 'Abandonada';
+            
+            // "Reembolsado" reflete o cancelamento do lado B2B
+            if (statusCalculado === 'Reembolsado') {
+               statusCalculado = 'Cancelada';
+            } else if (statusCalculado === 'Pendente' && minutosPassados > 15) {
+               statusCalculado = 'Abandonada';
             }
+
+            const pai = Array.isArray(reserva.perfis) ? reserva.perfis[0] : reserva.perfis;
 
             return {
               reservaId: reserva.id,
@@ -62,7 +67,14 @@ export default function GestaoReservasParceiro({ params }: { params: Promise<{ l
               extras: reserva.extras_escolhidos,
               respostasCustomizadas: reserva.respostas_customizadas || {},
               crianca: Array.isArray(reserva.criancas) ? reserva.criancas[0] : reserva.criancas,
-              pai: Array.isArray(reserva.perfis) ? reserva.perfis[0] : reserva.perfis,
+              paiEncarregado: {
+                nome: reserva.nome_encarregado || pai?.nome_completo || 'N/D',
+                email: reserva.email_encarregado || pai?.email || 'N/D',
+                telefone: reserva.telefone_encarregado || pai?.telefone || 'N/D',
+                nif: reserva.nif_encarregado || pai?.nif || 'N/D',
+                emergencia: pai?.contacto_emergencia || 'N/D',
+                recolha: pai?.pessoas_autorizadas_recolha || 'Apenas o Encarregado'
+              },
               campNome: isEn && c.nome_en ? c.nome_en : c.nome
             };
           });
@@ -78,7 +90,6 @@ export default function GestaoReservasParceiro({ params }: { params: Promise<{ l
             turnosDisponiveis: c.turnos || [],
             dataInicioCronologica: dataOrdenacao,
             inscritos: inscritos.sort((a: any, b: any) => new Date(b.dataReserva).getTime() - new Date(a.dataReserva).getTime()),
-            contratoUrl: c.contrato_parceiro_url
           };
         });
 
@@ -101,17 +112,6 @@ export default function GestaoReservasParceiro({ params }: { params: Promise<{ l
     const textoLimpo = texto.toLowerCase().trim();
     const palavrasIgnoradas = ["nenhuma", "nenhum", "nao", "não", "nada", "n/a", "no", "none", "-", "sem alergias", "saudavel", "saudável"];
     return !palavrasIgnoradas.includes(textoLimpo);
-  };
-
-  const toggleStatusPagamento = async (reservaId: string, statusAtual: string) => {
-    if (statusAtual === 'Abandonada') return; // Não permite alterar status de reservas abandonadas
-    
-    const novoStatus = statusAtual === 'Pago' ? 'Pendente' : 'Pago';
-    setCampoGrupos(prev => prev.map(g => ({
-      ...g,
-      inscritos: g.inscritos.map((i: any) => i.reservaId === reservaId ? { ...i, statusPagamento: novoStatus } : i)
-    })));
-    await supabase.from('reservas').update({ status_pagamento: novoStatus }).eq('id', reservaId);
   };
 
   let vagasTotaisExibidas = 0;
@@ -139,12 +139,11 @@ export default function GestaoReservasParceiro({ params }: { params: Promise<{ l
     }
   }
 
-  // APENAS AS RESERVAS PAGAS OU EM PROCESSO (PENDENTE < 15 MIN) CONTAM PARA AS VAGAS!
-  const inscritosValidosCount = inscritosRows.filter(r => r.statusPagamento !== 'Abandonada').length;
+  // APENAS AS RESERVAS VÁLIDAS CONTAM PARA A LOTAÇÃO
+  const inscritosValidosCount = inscritosRows.filter(r => r.statusPagamento !== 'Abandonada' && r.statusPagamento !== 'Cancelada').length;
 
   const exportarFichaMonitoresCSV = () => {
-    // Só exporta quem tem lugar garantido (Pagos e Pendentes recentes)
-    const validos = inscritosRows.filter(r => r.statusPagamento !== 'Abandonada');
+    const validos = inscritosRows.filter(r => r.statusPagamento !== 'Abandonada' && r.statusPagamento !== 'Cancelada');
     if (validos.length === 0) {
       alert("Não existem inscrições ativas no contexto selecionado para exportar.");
       return;
@@ -155,12 +154,12 @@ export default function GestaoReservasParceiro({ params }: { params: Promise<{ l
     
     validos.forEach((item: any) => {
       const c = item.crianca || {};
-      const p = item.pai || {};
+      const p = item.paiEncarregado || {};
       
       const cAlergias = temAlertaMedico(c.restricoes_alimentares) ? c.restricoes_alimentares.replace(/;/g, ",").replace(/\n/g, " ") : "Nenhuma";
       const cDoencas = temAlertaMedico(c.doencas_cronicas) ? c.doencas_cronicas.replace(/;/g, ",").replace(/\n/g, " ") : "Nenhuma";
       const cMeds = temAlertaMedico(c.medicacao_regular) ? c.medicacao_regular.replace(/;/g, ",").replace(/\n/g, " ") : "Nenhuma";
-      const recolha = p.pessoas_autorizadas_recolha ? p.pessoas_autorizadas_recolha.replace(/[\;\,\n]/g, " | ") : "Apenas Encarregado";
+      const recolha = p.recolha ? p.recolha.replace(/[\;\,\n]/g, " | ") : "Apenas Encarregado";
 
       let respostasTexto = "";
       if (item.respostasCustomizadas && Object.keys(item.respostasCustomizadas).length > 0) {
@@ -171,7 +170,7 @@ export default function GestaoReservasParceiro({ params }: { params: Promise<{ l
         respostasTexto = "Sem perguntas adicionais";
       }
 
-      csv += `"${item.campNome}";"${item.turno}";"${c.nome || ""}";"${c.data_nascimento ? obterIdade(c.data_nascimento) : ""}";"${c.sexo || ""}";"${c.tipo_sanguineo || "N/A"}";"${cAlergias}";"${cDoencas}";"${cMeds}";"${c.sabe_nadar || "N/A"}";"${c.sabe_andar_bicicleta || "N/A"}";"${c.tamanho_tshirt || "N/A"}";"${p.nome_completo || "N/A"}";"${p.telefone || "N/A"}";"${p.contacto_emergencia || "N/A"}";"${recolha}";"${respostasTexto}"\n`;
+      csv += `"${item.campNome}";"${item.turno}";"${c.nome || ""}";"${c.data_nascimento ? obterIdade(c.data_nascimento) : ""}";"${c.sexo || ""}";"${c.tipo_sanguineo || "N/A"}";"${cAlergias}";"${cDoencas}";"${cMeds}";"${c.sabe_nadar || "N/A"}";"${c.sabe_andar_bicicleta || "N/A"}";"${c.tamanho_tshirt || "N/A"}";"${p.nome || "N/A"}";"${p.telefone || "N/A"}";"${p.emergencia || "N/A"}";"${recolha}";"${respostasTexto}"\n`;
     });
 
     const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" });
@@ -183,16 +182,18 @@ export default function GestaoReservasParceiro({ params }: { params: Promise<{ l
     document.body.removeChild(link);
   };
 
+  if (loading) return <div style={{ padding: '4rem', textAlign: 'center', color: '#64748b' }}>A carregar dados logísticos e nominais...</div>;
+
   return (
     <div style={{ fontFamily: 'sans-serif', paddingBottom: '4rem', maxWidth: '1200px', margin: '0 auto', padding: '2rem 1.5rem' }}>
       
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '2.5rem', flexWrap: 'wrap', gap: '1.5rem' }}>
         <div>
           <h1 style={{ fontSize: '2.25rem', fontWeight: '900', color: '#0f172a', margin: 0 }}>
-            {isEn ? 'Executive Dashboard' : 'Gestão Avançada de Inscrições'}
+            {isEn ? 'Logistics Dashboard' : 'Gestão Logística de Vagas'}
           </h1>
           <p style={{ color: '#64748b', marginTop: '0.25rem' }}>
-            {isEn ? 'Real-time metrics, demography, and logistics data.' : 'Métricas em tempo real, demografia e controlo logístico de vagas.'}
+            {isEn ? 'Real-time metrics, demography, and logistics data.' : 'Lista nominal, fichas clínicas e controlo de capacidade.'}
           </p>
         </div>
 
@@ -222,29 +223,29 @@ export default function GestaoReservasParceiro({ params }: { params: Promise<{ l
       <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem' }}>
           <div style={statCardStyle}>
-            <span style={statLabelStyle}>{isEn ? 'TOTAL CAPACITY' : 'VAGAS CONFIGURADAS'}</span>
+            <span style={statLabelStyle}>{isEn ? 'TOTAL CAPACITY' : 'LOTAÇÃO MÁXIMA'}</span>
             <span style={{ fontSize: '2rem', fontWeight: '900', color: '#0f172a' }}>{vagasTotaisExibidas}</span>
           </div>
           <div style={{ ...statCardStyle, borderLeft: '4px solid #059669' }}>
-            <span style={statLabelStyle}>{isEn ? 'ACTIVE ENROLLMENTS' : 'INSCRIÇÕES ATIVAS'}</span>
+            <span style={statLabelStyle}>{isEn ? 'ACTIVE ENROLLMENTS' : 'LUGARES OCUPADOS'}</span>
             <span style={{ fontSize: '2rem', fontWeight: '900', color: '#059669' }}>{inscritosValidosCount}</span>
           </div>
           <div style={{ ...statCardStyle, backgroundColor: '#f8fafc', justifyContent: 'center', alignItems: 'center' }}>
             <button onClick={exportarFichaMonitoresCSV} disabled={inscritosValidosCount === 0} style={{ backgroundColor: inscritosValidosCount === 0 ? '#cbd5e1' : '#059669', color: 'white', border: 'none', padding: '0.75rem 1rem', borderRadius: '0.5rem', fontWeight: 'bold', cursor: inscritosValidosCount === 0 ? 'not-allowed' : 'pointer', fontSize: '13px', width: '100%', textAlign: 'center', boxShadow: '0 4px 12px rgba(5,150,105,0.15)' }}>
-              📥 {isEn ? 'Export Sheet for Monitors' : 'Exportar Ficha de Monitores'}
+              📥 {isEn ? 'Export Sheet for Monitors' : 'Ficha Excel (Monitores)'}
             </button>
           </div>
         </div>
 
         <div style={{ backgroundColor: 'white', borderRadius: '1.25rem', border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
           <div style={{ padding: '1.25rem 1.5rem', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-            <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '800', color: '#334155', textTransform: 'uppercase' }}>{isEn ? 'NOMINAL ROSTER' : 'LISTA NOMINAL DE PARTICIPANTES'}</h3>
+            <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '800', color: '#334155', textTransform: 'uppercase' }}>{isEn ? 'NOMINAL ROSTER' : 'LISTA DE PARTICIPANTES'}</h3>
           </div>
           
           <div style={{ overflowX: 'auto' }}>
             {inscritosRows.length === 0 ? (
               <div style={{ padding: '4rem', textAlign: 'center', color: '#94a3b8', fontSize: '14px', fontWeight: 'bold' }}>
-                Não existem inscrições processadas para este contexto de pesquisa.
+                Não existem inscrições registadas.
               </div>
             ) : (
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
@@ -252,51 +253,47 @@ export default function GestaoReservasParceiro({ params }: { params: Promise<{ l
                   <tr style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#fdfdfd' }}>
                     <th style={thStyle}>{isEn ? 'PARTICIPANT' : 'MIÚDO / PROGRAMA'}</th>
                     <th style={thStyle}>{isEn ? 'AGE' : 'IDADE'}</th>
-                    <th style={thStyle}>{isEn ? 'HEALTH/DIET' : 'ALERTAS DE SAÚDE'}</th>
-                    <th style={thStyle}>{isEn ? 'SHIFT' : 'TURNO'}</th>
-                    <th style={thStyle}>{isEn ? 'PAYMENT' : 'ESTADO'}</th>
+                    <th style={thStyle}>{isEn ? 'HEALTH/DIET' : 'SAÚDE'}</th>
+                    <th style={thStyle}>{isEn ? 'SHIFT' : 'TURNO / VALOR'}</th>
+                    <th style={thStyle}>{isEn ? 'PAYMENT' : 'ESTADO FINANÇAS'}</th>
                     <th style={thStyle}>{isEn ? 'ACTIONS' : 'AÇÕES'}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {inscritosRows.map((item: any, idx: number) => {
                     const temAlerta = temAlertaMedico(item.crianca?.restricoes_alimentares) || temAlertaMedico(item.crianca?.doencas_cronicas) || temAlertaMedico(item.crianca?.medicacao_regular);
-                    const isAbandonada = item.statusPagamento === 'Abandonada';
+                    const isInativa = item.statusPagamento === 'Abandonada' || item.statusPagamento === 'Cancelada';
                     
                     return (
-                      <tr key={idx} style={{ borderBottom: idx !== inscritosRows.length - 1 ? '1px solid #f1f5f9' : 'none', opacity: isAbandonada ? 0.5 : 1 }}>
+                      <tr key={idx} style={{ borderBottom: idx !== inscritosRows.length - 1 ? '1px solid #f1f5f9' : 'none', opacity: isInativa ? 0.6 : 1 }}>
                         <td style={tdStyle}>
-                          <div style={{ fontWeight: 'bold', color: '#0f172a', textDecoration: isAbandonada ? 'line-through' : 'none' }}>{item.crianca?.nome || 'N/A'}</div>
+                          <div style={{ fontWeight: 'bold', color: '#0f172a', textDecoration: isInativa ? 'line-through' : 'none' }}>{item.crianca?.nome || 'N/A'}</div>
                           <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '600' }}>🏕️ {item.campNome}</div>
                         </td>
                         <td style={tdStyle}>{item.crianca?.data_nascimento ? `${obterIdade(item.crianca.data_nascimento)} anos` : '-'}</td>
                         <td style={tdStyle}>
-                          {temAlerta && !isAbandonada ? (
-                            <span style={{ backgroundColor: '#fef2f2', color: '#b91c1c', padding: '0.35rem 0.75rem', borderRadius: '0.5rem', fontSize: '11px', fontWeight: 'bold' }}>
-                              ⚠️ Ficha Médica Ativa
+                          {temAlerta && !isInativa ? (
+                            <span style={{ backgroundColor: '#fef2f2', color: '#b91c1c', padding: '0.25rem 0.5rem', borderRadius: '0.5rem', fontSize: '11px', fontWeight: 'bold', border: '1px solid #fecaca' }}>
+                              ⚠️ Alerta Médico
                             </span>
                           ) : <span style={{ color: '#94a3b8' }}>-</span>}
                         </td>
                         <td style={{ ...tdStyle, fontWeight: '600' }}>
-                          {item.turno} <div style={{ fontSize: '11px', color: isAbandonada ? '#94a3b8' : '#059669' }}>{item.valor}€</div>
+                          {item.turno} <div style={{ fontSize: '11px', color: isInativa ? '#94a3b8' : '#0f172a', fontWeight: 'bold', marginTop: '2px' }}>{item.valor}€</div>
                         </td>
                         <td style={tdStyle}>
-                          <button 
-                            type="button" onClick={() => toggleStatusPagamento(item.reservaId, item.statusPagamento)}
-                            disabled={isAbandonada}
-                            style={{ 
-                              backgroundColor: item.statusPagamento === 'Pago' ? '#ecfdf5' : (isAbandonada ? '#f1f5f9' : '#fff7ed'), 
-                              color: item.statusPagamento === 'Pago' ? '#059669' : (isAbandonada ? '#64748b' : '#c2410c'), 
-                              border: `1px solid ${item.statusPagamento === 'Pago' ? '#a7f3d0' : (isAbandonada ? '#cbd5e1' : '#fed7aa')}`, 
-                              padding: '0.35rem 0.75rem', borderRadius: '999px', fontSize: '11px', fontWeight: '900', cursor: isAbandonada ? 'not-allowed' : 'pointer' 
-                            }}
-                          >
+                          <span style={{ 
+                            backgroundColor: item.statusPagamento === 'Pago' || item.statusPagamento === 'Sinal Pago' ? '#ecfdf5' : (item.statusPagamento === 'Cancelada' ? '#fef2f2' : '#f1f5f9'), 
+                            color: item.statusPagamento === 'Pago' || item.statusPagamento === 'Sinal Pago' ? '#059669' : (item.statusPagamento === 'Cancelada' ? '#dc2626' : '#64748b'), 
+                            border: `1px solid ${item.statusPagamento === 'Pago' || item.statusPagamento === 'Sinal Pago' ? '#a7f3d0' : (item.statusPagamento === 'Cancelada' ? '#fecaca' : '#cbd5e1')}`, 
+                            padding: '0.25rem 0.75rem', borderRadius: '999px', fontSize: '11px', fontWeight: '900', textTransform: 'uppercase'
+                          }}>
                             {item.statusPagamento}
-                          </button>
+                          </span>
                         </td>
                         <td style={tdStyle}>
                           <button onClick={() => setReservaSelecionada(item)} style={{ padding: '0.5rem 1rem', backgroundColor: '#f1f5f9', color: '#0f172a', border: '1px solid #cbd5e1', borderRadius: '0.5rem', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px' }}>
-                            {isEn ? 'View Details' : 'Ver Ficha'}
+                            {isEn ? 'View Data' : 'Ver Ficha'}
                           </button>
                         </td>
                       </tr>
@@ -309,15 +306,14 @@ export default function GestaoReservasParceiro({ params }: { params: Promise<{ l
         </div>
       </div>
 
-      {/* MODAL FICHA COMPLETA */}
       {reservaSelecionada && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.8)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', backdropFilter: 'blur(4px)' }}>
           <div style={{ backgroundColor: 'white', width: '100%', maxWidth: '850px', borderRadius: '1.5rem', overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column', maxHeight: '90vh' }}>
             
-            <div style={{ padding: '1.5rem 2rem', backgroundColor: reservaSelecionada.statusPagamento === 'Abandonada' ? '#64748b' : '#0f172a', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ padding: '1.5rem 2rem', backgroundColor: reservaSelecionada.statusPagamento === 'Cancelada' || reservaSelecionada.statusPagamento === 'Abandonada' ? '#dc2626' : '#0f172a', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: '900' }}>Ficha de Inscrição Completa {reservaSelecionada.statusPagamento === 'Abandonada' && '(Cancelada)'}</h2>
-                <p style={{ margin: '0.25rem 0 0 0', color: '#cbd5e1', fontSize: '14px' }}>Ref: {reservaSelecionada.reservaId}</p>
+                <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: '900' }}>Ficha de Participante {(reservaSelecionada.statusPagamento === 'Cancelada' || reservaSelecionada.statusPagamento === 'Abandonada') && '(Inscrição Anulada)'}</h2>
+                <p style={{ margin: '0.25rem 0 0 0', color: '#cbd5e1', fontSize: '12px', fontFamily: 'monospace' }}>Ref: {reservaSelecionada.reservaId}</p>
               </div>
               <button onClick={() => setReservaSelecionada(null)} style={{ background: 'none', border: 'none', color: 'white', fontSize: '2rem', cursor: 'pointer', lineHeight: 1 }}>&times;</button>
             </div>
@@ -326,26 +322,26 @@ export default function GestaoReservasParceiro({ params }: { params: Promise<{ l
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem' }}>
                 
                 <div style={modalCardStyle}>
-                  <h3 style={modalTitleStyle}>👦 {isEn ? 'Participant Data' : 'Dados do Participante'}</h3>
+                  <h3 style={modalTitleStyle}>👦 {isEn ? 'Participant Data' : 'Identificação'}</h3>
                   <DetailRow label="Nome" value={reservaSelecionada.crianca?.nome} />
                   <DetailRow label="Data Nasc." value={reservaSelecionada.crianca?.data_nascimento} />
                   <DetailRow label="Género" value={reservaSelecionada.crianca?.sexo} />
-                  <DetailRow label="NIF" value={reservaSelecionada.crianca?.nif} />
+                  <DetailRow label="NIF Criança" value={reservaSelecionada.crianca?.nif} />
                   
                   <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px dashed #e2e8f0' }}>
-                    <h4 style={{ fontSize: '12px', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', marginBottom: '0.75rem' }}>Logística Extra</h4>
+                    <h4 style={{ fontSize: '12px', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', marginBottom: '0.75rem' }}>Características Físicas</h4>
                     <DetailRow label="Sabe nadar?" value={reservaSelecionada.crianca?.sabe_nadar} />
-                    <DetailRow label="Sabe andar de bicicleta?" value={reservaSelecionada.crianca?.sabe_andar_bicicleta} />
+                    <DetailRow label="Andar bicicleta?" value={reservaSelecionada.crianca?.sabe_andar_bicicleta} />
                     <DetailRow label="T-Shirt" value={reservaSelecionada.crianca?.tamanho_tshirt} />
                   </div>
                 </div>
 
                 <div style={{...modalCardStyle, borderColor: '#fecaca'}}>
-                  <h3 style={{...modalTitleStyle, color: '#991b1b'}}>🏥 {isEn ? 'Medical Profile' : 'Perfil Médico e Alergias'}</h3>
+                  <h3 style={{...modalTitleStyle, color: '#991b1b'}}>🏥 {isEn ? 'Medical Profile' : 'Perfil Clínico e Restrições'}</h3>
                   <DetailRow label="Tipo Sanguíneo" value={reservaSelecionada.crianca?.tipo_sanguineo} />
                   
                   <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: '#fff7ed', borderRadius: '0.5rem', border: '1px solid #fed7aa' }}>
-                    <span style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#c2410c', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Restrições / Alergias Alimentares</span>
+                    <span style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#c2410c', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Alergias Alimentares</span>
                     <span style={{ fontSize: '14px', color: '#9a3412', fontWeight: 'bold' }}>{reservaSelecionada.crianca?.restricoes_alimentares || 'Nenhuma declarada'}</span>
                   </div>
                   
@@ -363,7 +359,7 @@ export default function GestaoReservasParceiro({ params }: { params: Promise<{ l
 
                 {reservaSelecionada.respostasCustomizadas && Object.keys(reservaSelecionada.respostasCustomizadas).length > 0 && (
                   <div style={{ ...modalCardStyle, gridColumn: '1 / -1', borderLeft: '4px solid #3b82f6', backgroundColor: '#eff6ff' }}>
-                    <h3 style={{...modalTitleStyle, color: '#1e40af', borderColor: '#bfdbfe'}}>📋 Respostas às Perguntas do Organizador</h3>
+                    <h3 style={{...modalTitleStyle, color: '#1e40af', borderColor: '#bfdbfe'}}>📋 Respostas ao Formulário do Campo</h3>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                       {Object.entries(reservaSelecionada.respostasCustomizadas).map(([pergunta, resposta]: any, idx: number) => (
                         <div key={idx} style={{ borderBottom: '1px solid #dbeafe', paddingBottom: '0.5rem' }}>
@@ -376,21 +372,22 @@ export default function GestaoReservasParceiro({ params }: { params: Promise<{ l
                 )}
 
                 <div style={{ ...modalCardStyle, gridColumn: '1 / -1' }}>
-                  <h3 style={modalTitleStyle}>🛡️ Segurança e Contactos do Encarregado</h3>
+                  <h3 style={modalTitleStyle}>🛡️ Logística de Recolha e Responsável</h3>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '2rem' }}>
                     <div>
-                      <DetailRow label="Encarregado" value={reservaSelecionada.pai?.nome_completo} />
-                      <DetailRow label="Telemóvel" value={reservaSelecionada.pai?.telefone} />
-                      <DetailRow label="Email" value={reservaSelecionada.pai?.email} />
+                      <DetailRow label="Responsável" value={reservaSelecionada.paiEncarregado?.nome} />
+                      <DetailRow label="Telefone" value={reservaSelecionada.paiEncarregado?.telefone} />
+                      <DetailRow label="Email" value={reservaSelecionada.paiEncarregado?.email} />
+                      <DetailRow label="NIF Cliente" value={reservaSelecionada.paiEncarregado?.nif} />
                     </div>
                     <div>
                       <div style={{ padding: '1rem', backgroundColor: '#fef2f2', borderRadius: '0.5rem', border: '1px solid #fecaca', marginBottom: '1rem' }}>
-                        <span style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#e11d48', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Contacto Urgente Alternativo</span>
-                        <span style={{ fontSize: '14px', color: '#9f1239', fontWeight: 'bold' }}>{reservaSelecionada.pai?.contacto_emergencia || 'Não preenchido'}</span>
+                        <span style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#e11d48', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Contacto de Emergência (Em caso de falha do pai)</span>
+                        <span style={{ fontSize: '14px', color: '#9f1239', fontWeight: 'bold' }}>{reservaSelecionada.paiEncarregado?.emergencia}</span>
                       </div>
                       <div style={{ padding: '1rem', backgroundColor: '#f0fdf4', borderRadius: '0.5rem', border: '1px solid #bbf7d0' }}>
-                        <span style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#059669', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Pessoas Autorizadas a Levantar a Criança</span>
-                        <span style={{ fontSize: '13px', color: '#064e3b', fontWeight: '600', whiteSpace: 'pre-wrap' }}>{reservaSelecionada.pai?.pessoas_autorizadas_recolha || 'Apenas o Encarregado'}</span>
+                        <span style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: '#059669', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Identificação de quem levanta a criança</span>
+                        <span style={{ fontSize: '13px', color: '#064e3b', fontWeight: '600', whiteSpace: 'pre-wrap' }}>{reservaSelecionada.paiEncarregado?.recolha}</span>
                       </div>
                     </div>
                   </div>
@@ -418,6 +415,6 @@ const modalTitleStyle = { margin: '0 0 1.5rem 0', fontSize: '1.125rem', fontWeig
 const DetailRow = ({ label, value }: { label: string, value: string }) => (
   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem', borderBottom: '1px dashed #f1f5f9', paddingBottom: '0.25rem' }}>
     <span style={{ fontSize: '13px', color: '#64748b', fontWeight: 'bold' }}>{label}:</span>
-    <span style={{ fontSize: '14px', color: '#0f172a', fontWeight: '700', textAlign: 'right', marginLeft: '1rem' }}>{value || 'N/A'}</span>
+    <span style={{ fontSize: '14px', color: '#0f172a', fontWeight: '700', textAlign: 'right', marginLeft: '1rem' }}>{value || 'N/D'}</span>
   </div>
 );
