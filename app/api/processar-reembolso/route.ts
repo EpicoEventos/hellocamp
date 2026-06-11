@@ -42,8 +42,14 @@ export async function POST(req: Request) {
       throw new Error("Esta reserva já se encontra reembolsada.");
     }
 
-    // 2. Procurar na Stripe a transação que pagou esta reserva.
-    // Como agrupamos IDs no metadata 'reservasIds', temos de procurar a sessão correspondente.
+    // 2. Procurar o organizador para saber se houve Split Payment (Stripe Connect)
+    const { data: orgData } = await supabase
+      .from('perfis')
+      .select('email, empresa_nome, stripe_account_id')
+      .eq('id', reserva.organizador_id)
+      .single();
+
+    // 3. Procurar na Stripe a transação que pagou esta reserva (agrupadas em reservasIds)
     const sessions = await stripe.checkout.sessions.list({ limit: 100 });
     const matchSession = sessions.data.find(s => {
       if (s.metadata && s.metadata.reservasIds) {
@@ -56,27 +62,35 @@ export async function POST(req: Request) {
     });
 
     if (!matchSession || !matchSession.payment_intent) {
-      throw new Error("Transação Stripe não encontrada para emitir reemboslo automático. Terá de reembolsar manualmente.");
+      throw new Error("Transação Stripe não encontrada para emitir reembolso automático. Terá de reembolsar manualmente.");
     }
 
-    // 3. EXECUTAR REEMBOLSO NA STRIPE
-    // Como a Stripe cobra o total agrupado, vamos reembolsar apenas a quantia exata desta criança.
+    // 4. EXECUTAR REEMBOLSO NA STRIPE
+    // Como a Stripe cobra o total agrupado, vamos reembolsar apenas a quantia exata desta reserva.
     const quantiaReembolsoCentimos = Math.round(Number(reserva.valor_total) * 100);
     
-    await stripe.refunds.create({
+    const refundParams: Stripe.RefundCreateParams = {
       payment_intent: matchSession.payment_intent as string,
       amount: quantiaReembolsoCentimos,
       reason: 'requested_by_customer'
-    });
+    };
 
-    // 4. ATUALIZAR A BASE DE DADOS PARA REFLETIR O REEMBOLSO
+    // A proteção inteligente: só faz reverse transfer se a transação original foi dividida
+    if (orgData?.stripe_account_id) {
+      refundParams.reverse_transfer = true;
+      refundParams.refund_application_fee = true;
+    }
+
+    await stripe.refunds.create(refundParams);
+
+    // 5. ATUALIZAR A BASE DE DADOS PARA REFLETIR O REEMBOLSO
     await supabase.from('reservas').update({
       status_pagamento: 'Reembolsado',
       status_reembolso: 'Processado Automaticamente',
       dados_reembolso: { data_estorno: new Date().toISOString(), processado_por: 'SuperAdmin HQ' }
     }).eq('id', reservaId);
 
-    // 5. DISPARAR OS 3 EMAILS B2B COM A NOTÍCIA
+    // 6. DISPARAR OS 3 EMAILS B2B COM A NOTÍCIA
     
     // Tratamento seguro de arrays da resposta do Supabase
     const campoNome = Array.isArray(reserva.campos) ? reserva.campos[0]?.nome : reserva.campos?.nome || 'Programa HelloCamp';
@@ -84,8 +98,7 @@ export async function POST(req: Request) {
     const emailPai = Array.isArray(reserva.perfis) ? reserva.perfis[0]?.email : reserva.perfis?.email;
     const nomeCrianca = Array.isArray(reserva.criancas) ? reserva.criancas[0]?.nome : reserva.criancas?.nome || 'Participante';
     const valorReembolsado = Number(reserva.valor_total).toFixed(2);
-
-    const { data: orgData } = await supabase.from('perfis').select('email, empresa_nome').eq('id', reserva.organizador_id).single();
+    
     const emailCampo = orgData?.email || 'info@hellocamp.pt';
 
     // EMAIL A. PARA O PAI
@@ -122,7 +135,7 @@ export async function POST(req: Request) {
       html: `
         <div style="font-family: Arial, sans-serif; padding: 20px; color: #0f172a; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #b91c1c; border-bottom: 2px solid #b91c1c; padding-bottom: 10px;">Cancelamento de Participante</h2>
-          <p>A seguinte reserva foi cancelada e o valor reembolsado ao cliente pela administração da HelloCamp:</p>
+          <p>A seguinte reserva foi cancelada e o valor estornado ao cliente pela administração da HelloCamp:</p>
           <div style="background-color: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0;">
             <p><strong>Programa:</strong> ${campoNome} (${reserva.turno_nome})</p>
             <p><strong>Criança:</strong> ${nomeCrianca}</p>
@@ -138,8 +151,17 @@ export async function POST(req: Request) {
     await resend.emails.send({
       from: 'HelloCamp Control <info@hellocamp.pt>',
       to: 'info@hellocamp.pt',
-      subject: `[REEMBOSLO BANCÁRIO] - ${valorReembolsado}€ devolvidos`,
-      html: `<div style="font-family: monospace; padding: 20px;"><h2>Alerta de Tesouraria</h2><p>Reemboslo automático concluído via Stripe Dashboard.</p><p><strong>Valor Reembolsado:</strong> ${valorReembolsado}€</p><p><strong>Ref Reserva:</strong> ${reservaId}</p><p><strong>Cliente:</strong> ${nomePai}</p><p><strong>Motivo:</strong> Reembolso acionado via Painel SuperAdmin HQ.</p></div>`
+      subject: `[REEMBOLSO BANCÁRIO] - ${valorReembolsado}€ devolvidos`,
+      html: `
+        <div style="font-family: monospace; padding: 20px;">
+          <h2>Alerta de Tesouraria</h2>
+          <p>Reembolso automático concluído via Stripe API.</p>
+          <p><strong>Valor Reembolsado:</strong> ${valorReembolsado}€</p>
+          <p><strong>Ref Reserva:</strong> ${reservaId}</p>
+          <p><strong>Cliente:</strong> ${nomePai}</p>
+          <p><strong>Proteção de Capital:</strong> ${orgData?.stripe_account_id ? 'Sim (Reverse Transfer ativado)' : 'Não aplicável (Não houve split payment original)'}</p>
+        </div>
+      `
     });
 
     return NextResponse.json({ success: true, message: 'Reembolso efetuado e comunicados enviados.' });
