@@ -25,24 +25,38 @@ export default function FaturacaoPage({ params }: { params: Promise<{ lang: stri
       const { data: perfilData } = await supabase.from('perfis').select('*').eq('id', session.user.id).single();
       setPerfil(perfilData || {});
 
-      const { data: camposData } = await supabase
-        .from('campos')
-        .select('id, nome, preco, taxa_comissao, base_comissao, contrato_parceiro_url')
-        .eq('organizador_id', session.user.id);
+      // Extração plana e à prova de falhas (Ignora os Joins nativos)
+      const { data: camposData } = await supabase.from('campos').select('id, nome, preco, taxa_comissao, base_comissao, contrato_parceiro_url').eq('organizador_id', session.user.id);
+      const { data: reservasData } = await supabase.from('reservas').select('*').eq('organizador_id', session.user.id).order('created_at', { ascending: false });
+      const { data: criancasData } = await supabase.from('criancas').select('id, nome');
+      const { data: perfisPaisData } = await supabase.from('perfis').select('id, nome_completo, nif');
+      
       setCamposParceiro(camposData || []);
 
-      const { data: reservasData } = await supabase
-        .from('reservas')
-        .select(`
-          id, created_at, valor_total, status_pagamento, turno_nome, campo_id, metodo_pagamento, status_reembolso, nome_encarregado, email_encarregado,
-          campos ( nome, preco, taxa_comissao, base_comissao ),
-          criancas ( nome ),
-          perfis:cliente_id ( nome_completo, nif )
-        `)
-        .eq('organizador_id', session.user.id)
-        .order('created_at', { ascending: false });
+      if (reservasData) {
+        const reservasConstruidas = reservasData.map(res => {
+          const campoEncontrado = camposData?.find(c => c.id === res.campo_id) || {};
+          const criancaEncontrada = criancasData?.find(cr => cr.id === res.crianca_id) || {};
+          const paiEncontrado = perfisPaisData?.find(p => p.id === res.cliente_id) || {};
+
+          // Controlo do Abandono de Compra
+          const dataReserva = new Date(res.created_at).getTime();
+          const minutosPassados = (new Date().getTime() - dataReserva) / (1000 * 60);
+          
+          let estadoReal = res.status_pagamento || 'Pendente';
+          if (estadoReal === 'Pendente' && minutosPassados > 15) estadoReal = 'Abandonada';
+
+          return {
+            ...res,
+            status_pagamento_real: estadoReal,
+            campos: campoEncontrado,
+            criancas: criancaEncontrada,
+            perfis: paiEncontrado
+          };
+        });
+        setReservasFull(reservasConstruidas);
+      }
       
-      setReservasFull(reservasData || []);
       setLoading(false);
     };
     carregarDados();
@@ -99,13 +113,14 @@ export default function FaturacaoPage({ params }: { params: Promise<{ lang: stri
 
   const historicoCalculado = reservasAtivas.map(res => {
     const valorReserva = Number(res.valor_total) || 0;
-    const isReembolsado = res.status_pagamento === 'Reembolsado';
+    const isInativa = res.status_pagamento_real === 'Reembolsado' || res.status_pagamento_real === 'Abandonada';
 
-    if (!isReembolsado) {
+    // Apenas reservas válidas acumulam no total de transacionado
+    if (!isInativa) {
       totalVolume += valorReserva;
     }
 
-    const campoAssociado = Array.isArray(res.campos) ? res.campos[0] : res.campos;
+    const campoAssociado = res.campos;
     const taxaLinha = (campoAssociado?.taxa_comissao !== null && campoAssociado?.taxa_comissao !== undefined) ? Number(campoAssociado.taxa_comissao) : Number(taxaComissaoGeral);
     const baseLinha = campoAssociado?.base_comissao || baseIncidenciaGeral;
 
@@ -117,16 +132,12 @@ export default function FaturacaoPage({ params }: { params: Promise<{ lang: stri
       valorIncidencia = 0;
     }
 
-    const valorComissao = isReembolsado ? 0 : valorIncidencia * (taxaLinha / 100);
+    const valorComissao = isInativa ? 0 : valorIncidencia * (taxaLinha / 100);
     
-    if (!isReembolsado) {
+    if (!isInativa) {
       totalComissoesGeradas += valorComissao;
       saldoParceiroSeraTransferido += (valorReserva - valorComissao);
     }
-
-    // Detalhes Pai e Filho
-    const perfilPai = Array.isArray(res.perfis) ? res.perfis[0] : res.perfis;
-    const criancaInfo = Array.isArray(res.criancas) ? res.criancas[0] : res.criancas;
 
     return { 
       ...res, 
@@ -135,8 +146,8 @@ export default function FaturacaoPage({ params }: { params: Promise<{ lang: stri
       taxaAplicada: taxaLinha, 
       baseAplicada: baseLinha,
       campoFormatado: campoAssociado,
-      paiFormatado: perfilPai,
-      criancaFormatado: criancaInfo
+      paiFormatado: res.perfis,
+      criancaFormatado: res.criancas
     };
   });
 
@@ -302,36 +313,39 @@ export default function FaturacaoPage({ params }: { params: Promise<{ lang: stri
               </thead>
               <tbody>
                 {historicoCalculado.map((res) => {
-                  const eReembolsado = res.status_pagamento === 'Reembolsado';
+                  const eReembolsado = res.status_pagamento_real === 'Reembolsado';
+                  const eAbandonada = res.status_pagamento_real === 'Abandonada';
+                  const isInativa = eReembolsado || eAbandonada;
+
                   const nomePai = res.nome_encarregado || res.paiFormatado?.nome_completo || 'N/D';
                   const nifPai = res.nif_encarregado || res.paiFormatado?.nif || 'S/ NIF';
 
                   return (
-                    <tr key={res.id} style={{ borderBottom: '1px solid #f1f5f9', opacity: eReembolsado ? 0.6 : 1 }}>
+                    <tr key={res.id} style={{ borderBottom: '1px solid #f1f5f9', opacity: isInativa ? 0.6 : 1 }}>
                       <td style={{ padding: '1rem', color: '#475569' }}>
                         {new Date(res.created_at).toLocaleDateString()}
-                        <div style={{ fontSize: '11px', fontWeight: 'bold', marginTop: '4px' }}>{res.metodo_pagamento || 'N/A'}</div>
+                        <div style={{ fontSize: '11px', fontWeight: 'bold', marginTop: '4px' }}>{res.metodo_pagamento || (eAbandonada ? 'Abortado' : 'N/A')}</div>
                       </td>
                       <td style={{ padding: '1rem' }}>
-                        <div style={{ fontWeight: 'bold', color: '#0f172a' }}>{res.campoFormatado?.nome}</div>
-                        <div style={{ fontSize: '12px', color: '#64748b' }}>👦 {res.criancaFormatado?.nome} ({res.turno_nome})</div>
+                        <div style={{ fontWeight: 'bold', color: '#0f172a' }}>{res.campoFormatado?.nome || 'N/D'}</div>
+                        <div style={{ fontSize: '12px', color: '#64748b' }}>👦 {res.criancaFormatado?.nome || 'N/D'} ({res.turno_nome})</div>
                       </td>
                       <td style={{ padding: '1rem' }}>
                         <div style={{ fontWeight: 'bold', color: '#334155' }}>{nomePai}</div>
                         <div style={{ fontSize: '11px', color: '#64748b' }}>NIF: {nifPai}</div>
                       </td>
                       <td style={{ padding: '1rem', fontWeight: 'bold' }}>{res.valor_total}€</td>
-                      <td style={{ padding: '1rem', fontWeight: 'bold', color: eReembolsado ? '#94a3b8' : '#ef4444' }}>
-                        {eReembolsado ? 'Anulada' : `${res.valorComissao.toFixed(2)}€`}
-                        {!eReembolsado && <span style={{ display: 'block', fontSize: '10px', color: '#94a3b8', fontWeight: 'normal' }}>({res.taxaAplicada}%)</span>}
+                      <td style={{ padding: '1rem', fontWeight: 'bold', color: isInativa ? '#94a3b8' : '#ef4444' }}>
+                        {isInativa ? 'Anulada' : `${res.valorComissao.toFixed(2)}€`}
+                        {!isInativa && <span style={{ display: 'block', fontSize: '10px', color: '#94a3b8', fontWeight: 'normal' }}>({res.taxaAplicada}%)</span>}
                       </td>
                       <td style={{ padding: '1rem' }}>
                         <span style={{ 
                           padding: '0.25rem 0.75rem', borderRadius: '999px', fontSize: '11px', fontWeight: '900', textTransform: 'uppercase',
-                          backgroundColor: eReembolsado ? '#fef2f2' : (res.status_pagamento === 'Pago' || res.status_pagamento === 'Sinal Pago' ? '#ecfdf5' : '#f1f5f9'),
-                          color: eReembolsado ? '#ef4444' : (res.status_pagamento === 'Pago' || res.status_pagamento === 'Sinal Pago' ? '#059669' : '#64748b')
+                          backgroundColor: res.status_pagamento_real === 'Pago' || res.status_pagamento_real === 'Sinal Pago' ? '#ecfdf5' : (eReembolsado ? '#fef2f2' : '#f1f5f9'),
+                          color: res.status_pagamento_real === 'Pago' || res.status_pagamento_real === 'Sinal Pago' ? '#059669' : (eReembolsado ? '#dc2626' : '#64748b')
                         }}>
-                          {res.status_pagamento || 'Pendente'}
+                          {res.status_pagamento_real}
                         </span>
                       </td>
                     </tr>

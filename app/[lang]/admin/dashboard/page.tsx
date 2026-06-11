@@ -12,7 +12,6 @@ export default function DashboardMarketing({ params }: { params: Promise<{ lang:
   const [loading, setLoading] = useState(true);
   const [nomeEmpresa, setNomeEmpresa] = useState("");
   
-  // Métricas de Marketing
   const [metricas, setMetricas] = useState({
     totalReservas: 0,
     vezesGuardado: 0, 
@@ -21,7 +20,6 @@ export default function DashboardMarketing({ params }: { params: Promise<{ lang:
     mediaEstrelas: 0,
   });
 
-  // Motor de Sugestões e Alertas
   const [sugestoes, setSugestoes] = useState<any[]>([]);
 
   useEffect(() => {
@@ -31,7 +29,7 @@ export default function DashboardMarketing({ params }: { params: Promise<{ lang:
 
       const userId = session.user.id;
 
-      // 1. Busca Perfil (Incluindo verificação Stripe)
+      // 1. Busca Perfil
       const { data: perfil } = await supabase.from('perfis').select('empresa_nome, nome_completo, stripe_account_id').eq('id', userId).single();
       
       if (perfil) {
@@ -46,7 +44,7 @@ export default function DashboardMarketing({ params }: { params: Promise<{ lang:
         setNomeEmpresa(isEn ? "Organizer" : "Organizador");
       }
 
-      // 2. Busca Campos do Parceiro para Análise de Conversão
+      // 2. Busca Campos do Parceiro
       const { data: campos } = await supabase.from('campos').select('id, nome, contrato_parceiro_url, rating_score, total_reviews, galeria, programas_pdf, imagem').eq('organizador_id', userId);
       const camposIds = campos?.map(c => c.id) || [];
       
@@ -56,7 +54,6 @@ export default function DashboardMarketing({ params }: { params: Promise<{ lang:
       let totalComReviews = 0;
       const novasSugestoes: any[] = [];
 
-      // ALERTA FINANCEIRO CRÍTICO (STRIPE)
       if (!perfil?.stripe_account_id) {
         novasSugestoes.push({ 
           tipo: 'critical', 
@@ -122,10 +119,14 @@ export default function DashboardMarketing({ params }: { params: Promise<{ lang:
         }
       });
 
-      // 3. Busca Total de Reservas (Métrica de Sucesso)
-      const { count: countReservas } = await supabase.from('reservas').select('*', { count: 'exact', head: true }).eq('organizador_id', userId);
+      // 3. Busca Total de Reservas (Apenas as pagas contam como sucesso no Marketing!)
+      const { count: countReservas } = await supabase
+        .from('reservas')
+        .select('*', { count: 'exact', head: true })
+        .eq('organizador_id', userId)
+        .in('status_pagamento', ['Pago', 'Sinal Pago']);
 
-      // 4. Busca Wishlists (Funil de Desejo)
+      // 4. Busca Wishlists 
       let vezesGuardadoTotal = 0;
       if (camposIds.length > 0) {
         const { count } = await supabase.from('wishlist_campos').select('*', { count: 'exact', head: true }).in('campo_id', camposIds);
@@ -140,7 +141,6 @@ export default function DashboardMarketing({ params }: { params: Promise<{ lang:
         mediaEstrelas: totalComReviews > 0 ? (somaEstrelas / totalComReviews) : 0,
       });
 
-      // Ordenar sugestões (Críticos primeiro)
       const prioridade: Record<string, number> = { 'critical': 1, 'warning': 2, 'info': 3, 'idea': 4 };
       novasSugestoes.sort((a, b) => prioridade[a.tipo] - prioridade[b.tipo]);
 
@@ -174,15 +174,12 @@ export default function DashboardMarketing({ params }: { params: Promise<{ lang:
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '2.5rem', alignItems: 'start' }}>
         
-        {/* COLUNA ESQUERDA: FUNIL E MÉTRICAS */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-          
           <h2 style={{ fontSize: '1.25rem', fontWeight: '900', color: '#0f172a', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             {isEn ? 'Traction & Marketing' : 'Tração & Marketing'}
           </h2>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1.5rem' }}>
-            {/* Wishlists */}
             <div style={{ backgroundColor: 'white', padding: '1.5rem', borderRadius: '1.5rem', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
                 <div style={{ width: '3rem', height: '3rem', backgroundColor: '#fef2f2', color: '#ef4444', borderRadius: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem' }}>❤️</div>
@@ -192,7 +189,6 @@ export default function DashboardMarketing({ params }: { params: Promise<{ lang:
               <p style={{ margin: '0.5rem 0 0 0', fontSize: '12px', color: '#64748b', fontWeight: '600' }}>{isEn ? 'Times your camps were saved.' : 'Vezes que guardaram os seus campos.'}</p>
             </div>
 
-            {/* Avaliações */}
             <div style={{ backgroundColor: 'white', padding: '1.5rem', borderRadius: '1.5rem', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
                 <div style={{ width: '3rem', height: '3rem', backgroundColor: '#fefce8', color: '#eab308', borderRadius: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem' }}>⭐</div>
@@ -202,17 +198,15 @@ export default function DashboardMarketing({ params }: { params: Promise<{ lang:
               <p style={{ margin: '0.5rem 0 0 0', fontSize: '12px', color: '#64748b', fontWeight: '600' }}>{isEn ? 'Average score.' : 'Média das reviews recebidas.'}</p>
             </div>
 
-            {/* Total Inscritos */}
             <div style={{ backgroundColor: 'white', padding: '1.5rem', borderRadius: '1.5rem', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)', gridColumn: '1 / -1' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
                 <div style={{ width: '3rem', height: '3rem', backgroundColor: '#f0fdf4', color: '#10b981', borderRadius: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem' }}>🎫</div>
-                <span style={{ fontSize: '11px', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{isEn ? 'Total Bookings' : 'Total de Inscrições'}</span>
+                <span style={{ fontSize: '11px', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{isEn ? 'Total Confirmed Bookings' : 'Total de Inscrições Validadas'}</span>
               </div>
               <span style={{ fontSize: '2.5rem', fontWeight: '900', color: '#10b981', display: 'block', lineHeight: 1 }}>{metricas.totalReservas}</span>
             </div>
           </div>
 
-          {/* ATALHOS RÁPIDOS */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             <Link href={`/${lang}/admin/reservas`} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', backgroundColor: '#f8fafc', padding: '1.5rem', borderRadius: '1rem', border: '1px solid #e2e8f0', textDecoration: 'none', transition: 'border-color 0.2s' }}>
               <span style={{ fontSize: '1.5rem' }}>📋</span>
@@ -223,10 +217,8 @@ export default function DashboardMarketing({ params }: { params: Promise<{ lang:
               <span style={{ fontSize: '14px', fontWeight: '800', color: '#0f172a' }}>{isEn ? 'Finance & Billing' : 'Finanças e Faturação'} &rarr;</span>
             </Link>
           </div>
-
         </div>
 
-        {/* COLUNA DIREITA: MOTOR DE OTIMIZAÇÃO (Avisos e Sugestões) */}
         <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '1.5rem', border: '1px solid #e2e8f0', boxShadow: '0 10px 15px -3px rgba(15,23,42,0.05)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
             <h2 style={{ fontSize: '1.25rem', fontWeight: '900', color: '#0f172a', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
