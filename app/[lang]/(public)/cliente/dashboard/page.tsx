@@ -4,7 +4,6 @@ import { useEffect, useState, use } from "react";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import React from "react";
-import SugestoesMagicas from "../../components/SugestoesMagicas";
 
 export default function DashboardCliente({ params }: { params: Promise<{ lang: string }> }) {
   const { lang } = use(params);
@@ -103,9 +102,12 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
     fetchData();
   }, [lang, isEn]);
 
-  // Gravação dos dados de perfil via modal de forma atómica
-  const handleSavePerfil = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSavePerfil = async () => {
+    if (!perfilForm.nome_completo || !perfilForm.nif || !perfilForm.telefone || !perfilForm.contacto_emergencia) {
+      alert(isEn ? "Please fill in all required fields." : "Por favor preencha todos os campos obrigatórios.");
+      return;
+    }
+
     setSavingPerfil(true);
 
     const { error } = await supabase
@@ -121,7 +123,6 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
     if (error) {
       alert((isEn ? "Error updating profile: " : "Erro ao atualizar perfil: ") + error.message);
     } else {
-      // Atualiza o estado local para esconder o bloco de avisos imediatamente
       setPerfilPai((prev: any) => ({ ...prev, ...perfilForm }));
       setDadosEmFalta(verificarFaltas(perfilForm));
       setIsPerfilModalOpen(false);
@@ -199,7 +200,6 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
               <ul className="list-disc pl-5 text-amber-700 text-sm font-semibold mb-4">
                 {dadosEmFalta.map((falta, idx) => <li key={idx}>{falta}</li>)}
               </ul>
-              {/* MODIFICAÇÃO: Abre a Lightbox em vez de redirecionar */}
               <button 
                 onClick={() => setIsPerfilModalOpen(true)}
                 className="bg-amber-600 hover:bg-amber-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm transition-colors shadow-sm cursor-pointer"
@@ -370,7 +370,7 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
               </button>
             </div>
 
-            <form onSubmit={handleSavePerfil} className="p-6 flex flex-col gap-4">
+            <div className="p-6 flex flex-col gap-4">
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">{isEn ? 'Full Name' : 'Nome Completo Encarregado'}</label>
                 <input type="text" required value={perfilForm.nome_completo} onChange={e => setPerfilForm({...perfilForm, nome_completo: e.target.value})} className="w-full p-3 border border-slate-200 rounded-xl text-sm text-slate-900 outline-none focus:border-emerald-500 bg-slate-50" />
@@ -391,10 +391,10 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
                 <input type="tel" required value={perfilForm.contacto_emergencia} onChange={e => setPerfilForm({...perfilForm, contacto_emergencia: e.target.value})} className="w-full p-3 border border-slate-200 rounded-xl text-sm text-slate-900 outline-none focus:border-emerald-500 bg-slate-50" placeholder="Ex: Contacto dos Avós / Cônjuge" />
               </div>
 
-              <button type="submit" disabled={savingPerfil} className="w-full p-3.5 bg-slate-900 hover:bg-emerald-600 text-white font-bold rounded-xl text-sm transition-colors mt-2 disabled:opacity-50 cursor-pointer">
+              <button onClick={handleSavePerfil} disabled={savingPerfil} className="w-full p-3.5 bg-slate-900 hover:bg-emerald-600 text-white font-bold rounded-xl text-sm transition-colors mt-2 disabled:opacity-50 cursor-pointer">
                 {savingPerfil ? (isEn ? 'Saving data...' : 'A gravar dados...') : (isEn ? 'Save and Update Profile' : 'Gravar e Atualizar Perfil')}
               </button>
-            </form>
+            </div>
           </div>
         </div>
       )}

@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, use } from "react";
-import { supabase } from "../../../../../lib/supabase";
+import { supabase } from "@/lib/supabase"; // Ajuste o caminho se necessário
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import React from "react";
 
 export default function RegistoAdmin({ params }: { params: Promise<{ lang: string }> }) {
   const { lang } = use(params);
@@ -22,16 +23,14 @@ export default function RegistoAdmin({ params }: { params: Promise<{ lang: strin
     setLoading(true);
     setError(null);
 
-    // 1. Criar utilizador no Supabase Auth
     const { data, error: authError } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: {
-          nome_empresa: nomeEmpresa,
-          role: 'organizador' // Define o tipo de utilizador
+          empresa_nome: nomeEmpresa, // Variável que a Faturação e os Emails procuram
+          role: 'organizador'        // <--- Crucial para a BD saber que é Parceiro B2B
         },
-        // Redireciona o utilizador para o login após confirmar o email
         emailRedirectTo: `${window.location.origin}/${lang}/admin/login`
       }
     });
@@ -60,7 +59,7 @@ export default function RegistoAdmin({ params }: { params: Promise<{ lang: strin
         {sucesso ? (
           <div style={{ backgroundColor: '#ecfdf5', color: '#065f46', padding: '1.5rem', borderRadius: '1rem', textAlign: 'center' }}>
             <h3 style={{ fontWeight: 'bold', marginBottom: '0.5rem' }}>{isEn ? 'Check your email!' : 'Verifique o seu email!'}</h3>
-            <p style={{ fontSize: '14px' }}>{isEn ? 'We sent a confirmation link to activate your account.' : 'Enviámos um link de confirmação para ativar a sua conta.'}</p>
+            <p style={{ fontSize: '14px', margin: 0 }}>{isEn ? 'We sent a confirmation link to activate your account.' : 'Enviámos um link de confirmação para ativar a sua conta.'}</p>
           </div>
         ) : (
           <form onSubmit={handleRegisto} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
