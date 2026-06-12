@@ -72,31 +72,27 @@ export default async function Home({
   return (
     <main className="min-h-screen bg-white font-sans text-slate-900">
       
-      {/* HERO SECTION */}
-      <section className="relative h-[75vh] w-full flex items-center justify-center overflow-hidden">
-        <div className="absolute inset-0 z-0">
+      {/* HERO SECTION COM CAIXA DE FILTROS EMBUTIDA */}
+      <section className="relative min-h-[85vh] w-full flex flex-col items-center justify-center overflow-visible pt-16 pb-32">
+        <div className="absolute inset-0 z-0 overflow-hidden">
           <img src="https://images.unsplash.com/photo-1596464716127-f2a82984de30?auto=format&fit=crop&q=80&w=2000" alt="Crianças no campo" className="w-full h-full object-cover" />
-          <div className="absolute inset-0 bg-black/40"></div>
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]"></div>
         </div>
-        <div className="relative z-10 flex flex-col items-center px-6 text-center max-w-4xl mx-auto">
-          <h1 className="text-4xl md:text-6xl lg:text-7xl font-black tracking-tight text-white leading-tight">{dict.home.titulo}</h1>
-          <p className="mt-6 text-lg md:text-2xl font-medium text-white/90 tracking-wide leading-relaxed max-w-3xl">
-            {dict.home.subtitulo}
-          </p>
-        </div>
-      </section>
-
-      {/* SEARCH FILTERS BOX */}
-      <section id="pesquisa" className="relative py-20 bg-slate-50 border-b border-slate-200 scroll-mt-20">
-        <div className="max-w-5xl mx-auto px-4 md:px-6">
+        
+        <div className="relative z-10 w-full max-w-5xl mx-auto px-4 md:px-6 flex flex-col items-center mt-8">
           
-          <div className="text-center mb-10">
-            <p className="text-xs font-bold text-emerald-700 uppercase tracking-widest mb-3">{dict.home.filtros_inteligentes}</p>
-            <h2 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">{dict.home.encontre_campo}</h2>
-            <p className="mt-4 text-base text-slate-500 max-w-2xl mx-auto leading-relaxed">{dict.home.descricao_filtros}</p>
+          {/* TÍTULOS HERO */}
+          <div className="text-center mb-10 md:mb-14 w-full">
+            <h1 className="text-4xl md:text-6xl lg:text-7xl font-black tracking-tight text-white leading-tight drop-shadow-md">
+              {dict.home.titulo}
+            </h1>
+            <p className="mt-4 md:mt-6 text-lg md:text-2xl font-medium text-white/95 tracking-wide leading-relaxed max-w-3xl mx-auto drop-shadow">
+              {dict.home.subtitulo}
+            </p>
           </div>
 
-          <div className="relative bg-white rounded-3xl shadow-xl shadow-slate-200/50 p-6 md:p-10 border border-slate-100 max-w-4xl mx-auto mb-8">
+          {/* CAIXA DE FILTROS SOBRE A FOTOGRAFIA */}
+          <div id="pesquisa" className="relative w-full bg-white rounded-3xl shadow-2xl p-6 md:p-10 border border-white/20 scroll-mt-24">
             
             {/* BOTÃO VER NO MAPA */}
             <div className="absolute top-5 right-5 z-20 hidden md:block">
@@ -105,9 +101,9 @@ export default async function Home({
               </Link>
             </div>
 
-            <form action={`/${lang}/pesquisa`} method="GET" className="mt-8 md:mt-4 relative pb-8 md:pb-0">
+            <form action={`/${lang}/pesquisa`} method="GET" className="relative pb-10 md:pb-4 mt-4 md:mt-0">
               
-              {/* 1. NOVA BARRA DE TEXTO LIVRE */}
+              {/* 1. BARRA DE TEXTO LIVRE */}
               <div className="mb-6 relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                   <span className="text-slate-400 text-lg">🔍</span>
@@ -120,14 +116,14 @@ export default async function Home({
                 />
               </div>
 
-              {/* 2. SEPARADOR ELEGANTE "BUSCA AVANÇADA" */}
+              {/* 2. SEPARADOR "BUSCA AVANÇADA" */}
               <div className="flex items-center gap-4 w-full mb-6">
                 <div className="h-px bg-slate-100 flex-1"></div>
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{isEn ? 'Advanced Search' : 'Busca Avançada'}</span>
                 <div className="h-px bg-slate-100 flex-1"></div>
               </div>
 
-              {/* 3. 4 DROPDOWNS CLÁSSICOS (Original) */}
+              {/* 3. DROPDOWNS */}
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 w-full">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-900 uppercase tracking-wider mb-2 ml-1">{isEn ? 'Country' : 'País'}</label>
@@ -162,9 +158,9 @@ export default async function Home({
                 </div>
               </div>
 
-              {/* 4. BOTÃO REDONDO AMARELO - MANTIDO EXATAMENTE IGUAL */}
+              {/* 4. BOTÃO REDONDO AMARELO - FLUTUANTE NA BASE DA CAIXA */}
               <div className="flex justify-center mt-8 md:absolute md:-bottom-[4.5rem] md:left-1/2 md:-translate-x-1/2">
-                <button type="submit" className="group w-full md:w-24 md:h-24 bg-[#EBA914] hover:bg-amber-500 rounded-xl md:rounded-full flex flex-row md:flex-col items-center justify-center gap-2 py-4 shadow-lg shadow-amber-500/30 md:border-[6px] md:border-slate-50 transition-transform hover:scale-105 z-20 cursor-pointer">
+                <button type="submit" className="group w-full md:w-24 md:h-24 bg-[#EBA914] hover:bg-amber-500 rounded-xl md:rounded-full flex flex-row md:flex-col items-center justify-center gap-2 py-4 shadow-xl shadow-amber-500/40 md:border-[6px] md:border-white transition-transform hover:scale-105 z-20 cursor-pointer">
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                   <span className="text-white text-sm md:text-[10px] font-black uppercase tracking-wider">{dict.home.pesquisar}</span>
                 </button>
