@@ -28,7 +28,6 @@ export default function AssinaturaContratoPage({ params }: { params: Promise<{ l
     website: "",
     responsavelRGPD: "",
     modalidadeReserva: "", // Anexo 1: 'email' ou 'direta'
-    modalidadeCancelamentoB2B: "", // Anexo 3 B2B: 'gratuito' ou 'reduzida'
     acordosComplementares: "",
     assinaturaNome: "",
     assinaturaCargo: "",
@@ -36,7 +35,7 @@ export default function AssinaturaContratoPage({ params }: { params: Promise<{ l
     
     // Configurações que vão diretamente para as colunas do Supabase (Pais)
     tipo_pagamento: "100_total",
-    politica_cancelamento: "Moderada (Reembolso a 50% até 15 dias antes)"
+    politica_cancelamento: "" // Anexo 3 Unificado
   });
 
   useEffect(() => {
@@ -60,7 +59,7 @@ export default function AssinaturaContratoPage({ params }: { params: Promise<{ l
       setForm(prev => ({
         ...prev,
         tipo_pagamento: campoData.tipo_pagamento || "100_total",
-        politica_cancelamento: campoData.politica_cancelamento || "Moderada (Reembolso a 50% até 15 dias antes)"
+        politica_cancelamento: campoData.politica_cancelamento || ""
       }));
       
       setLoading(false);
@@ -70,7 +69,7 @@ export default function AssinaturaContratoPage({ params }: { params: Promise<{ l
 
   const handleSubmeter = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.modalidadeReserva || !form.modalidadeCancelamentoB2B) {
+    if (!form.modalidadeReserva || !form.politica_cancelamento) {
       alert("Por favor, selecione as opções obrigatórias nos Anexos 1 e 3.");
       return;
     }
@@ -88,7 +87,7 @@ export default function AssinaturaContratoPage({ params }: { params: Promise<{ l
       website: form.website,
       responsavelRGPD: form.responsavelRGPD,
       modalidadeReserva: form.modalidadeReserva,
-      modalidadeCancelamento: form.modalidadeCancelamentoB2B,
+      politicaCancelamento: form.politica_cancelamento, // Guardamos a escolha unificada
       acordosComplementares: form.acordosComplementares,
       assinaturaNome: form.assinaturaNome,
       assinaturaCargo: form.assinaturaCargo,
@@ -314,38 +313,37 @@ export default function AssinaturaContratoPage({ params }: { params: Promise<{ l
               </div>
             </div>
 
-            {/* ANEXO 3 - CANCELAMENTOS */}
+            {/* ANEXO 3 - CANCELAMENTOS UNIFICADO */}
             <div>
-              <h3 className="font-black text-lg mb-4 text-black uppercase border-l-4 border-[#EBA914] pl-3">Anexo 3 – Cancelamento de Reservas por Iniciativa do Cliente</h3>
-              <p className="mb-4">O Parceiro deverá selecionar o regime de cancelamento aplicável às reservas efetuadas através da plataforma HelloCamp.</p>
+              <h3 className="font-black text-lg mb-4 text-black uppercase border-l-4 border-[#EBA914] pl-3">Anexo 3 – Política de Cancelamento e Reembolso</h3>
+              <p className="mb-4 text-justify leading-relaxed">O Parceiro deverá selecionar a política de cancelamento aplicável à atividade, a qual será visível para os clientes na página do programa. A comissão devida à HelloCamp será sempre ajustada proporcionalmente ao montante que o Parceiro retiver do cliente em caso de desistência.</p>
               
-              {/* OPÇÕES B2B (Como a HelloCamp cobra a comissão) */}
-              <div className="space-y-3 bg-gray-50 p-6 rounded-lg border border-gray-200 mb-6">
-                <label className="flex items-start gap-4 cursor-pointer hover:bg-gray-100 p-3 rounded transition-colors">
-                  <input type="radio" name="anexo3b2b" required value="gratuito" onChange={e => setForm({...form, modalidadeCancelamentoB2B: e.target.value})} className="mt-1 w-4 h-4 accent-black" />
+              <div className="space-y-3 bg-amber-50 p-6 rounded-lg border border-amber-200 mb-6">
+                
+                <label className="flex items-start gap-4 cursor-pointer hover:bg-amber-100 p-3 rounded transition-colors">
+                  <input type="radio" name="anexo3" required value="Flexível (Reembolso a 100% até 7 dias antes)" checked={form.politica_cancelamento === 'Flexível (Reembolso a 100% até 7 dias antes)'} onChange={e => setForm({...form, politica_cancelamento: e.target.value})} className="mt-1 w-4 h-4 accent-amber-600" />
                   <div>
-                    <strong className="block text-black mb-1">Cancelamento Gratuito e Sem Comissão</strong>
-                    <span className="text-gray-600 leading-relaxed block">A HelloCamp não cobrará qualquer comissão sobre reservas canceladas pelo cliente. O Parceiro compromete-se a não aplicar quaisquer custos de cancelamento ao cliente, desde que o pedido seja comunicado até 12 dias antes do início da atividade. Os montantes já pagos deverão ser reembolsados no prazo máximo de 30 dias. Caso o cancelamento ocorra após este prazo, poderão ser aplicadas as condições do Parceiro, renunciando a HelloCamp à sua comissão.</span>
+                    <strong className="block text-amber-900 mb-1">Flexível (Reembolso a 100% até 7 dias antes)</strong>
+                    <span className="text-amber-800 leading-relaxed block text-sm">O cliente tem direito à devolução integral do valor pago caso cancele até 7 dias antes do início do programa. Nestes casos, a HelloCamp isenta o Parceiro do pagamento de qualquer comissão. Cancelamentos após este prazo não conferem direito a reembolso, sendo devida a comissão integral à HelloCamp.</span>
                   </div>
                 </label>
 
-                <label className="flex items-start gap-4 cursor-pointer hover:bg-gray-100 p-3 rounded transition-colors border-t border-gray-200 pt-5">
-                  <input type="radio" name="anexo3b2b" required value="reduzida" onChange={e => setForm({...form, modalidadeCancelamentoB2B: e.target.value})} className="mt-1 w-4 h-4 accent-black" />
+                <label className="flex items-start gap-4 cursor-pointer hover:bg-amber-100 p-3 rounded transition-colors border-t border-amber-200 pt-5">
+                  <input type="radio" name="anexo3" required value="Moderada (Reembolso a 50% até 15 dias antes)" checked={form.politica_cancelamento === 'Moderada (Reembolso a 50% até 15 dias antes)'} onChange={e => setForm({...form, politica_cancelamento: e.target.value})} className="mt-1 w-4 h-4 accent-amber-600" />
                   <div>
-                    <strong className="block text-black mb-1">Comissão Reduzida em Caso de Cancelamento</strong>
-                    <span className="text-gray-600 leading-relaxed block">A comissão da HelloCamp é devida após a confirmação. Em caso de cancelamento, o Parceiro poderá aplicar os seus custos de cancelamento gerais. Nestas situações, a comissão da HelloCamp será reduzida proporcionalmente ao valor cobrado ao cliente. Para beneficiar desta redução, deverá comunicar o cancelamento no prazo máximo de 2 dias úteis. A não comparência será considerada cancelamento no dia de início.</span>
+                    <strong className="block text-amber-900 mb-1">Moderada (Reembolso a 50% até 15 dias antes)</strong>
+                    <span className="text-amber-800 leading-relaxed block text-sm">O cliente recebe 50% do valor pago caso cancele até 15 dias antes do início. O Parceiro retém os restantes 50% a título de penalização, sendo a comissão da HelloCamp recalculada e aplicada apenas sobre esse valor retido. Cancelamentos após este prazo não conferem direito a reembolso.</span>
                   </div>
                 </label>
-              </div>
 
-              {/* OPÇÕES B2C (O que aparece aos Pais no Campo) */}
-              <div className="bg-amber-50 border border-amber-200 p-5 rounded-lg">
-                <label className="block text-xs font-bold text-amber-900 uppercase tracking-widest mb-2">Política de Cancelamento (Visível na Página do Campo)</label>
-                <select required value={form.politica_cancelamento} onChange={e => setForm({...form, politica_cancelamento: e.target.value})} className="w-full p-3 bg-white border border-amber-300 rounded-lg text-sm font-bold text-slate-800 outline-none focus:border-amber-500 cursor-pointer">
-                  <option value="Flexível (Reembolso a 100% até 7 dias antes)">Flexível (Reembolso a 100% até 7 dias antes)</option>
-                  <option value="Moderada (Reembolso a 50% até 15 dias antes)">Moderada (Reembolso a 50% até 15 dias antes)</option>
-                  <option value="Estrita (Sem reembolso após reserva)">Estrita (Sem reembolso após reserva)</option>
-                </select>
+                <label className="flex items-start gap-4 cursor-pointer hover:bg-amber-100 p-3 rounded transition-colors border-t border-amber-200 pt-5">
+                  <input type="radio" name="anexo3" required value="Estrita (Sem reembolso após reserva)" checked={form.politica_cancelamento === 'Estrita (Sem reembolso após reserva)'} onChange={e => setForm({...form, politica_cancelamento: e.target.value})} className="mt-1 w-4 h-4 accent-amber-600" />
+                  <div>
+                    <strong className="block text-amber-900 mb-1">Estrita (Sem reembolso após reserva)</strong>
+                    <span className="text-amber-800 leading-relaxed block text-sm">As reservas efetuadas são finais e não reembolsáveis em caso de cancelamento por iniciativa do cliente. A comissão da HelloCamp é devida na sua totalidade independentemente de o cliente comparecer ou não à atividade.</span>
+                  </div>
+                </label>
+
               </div>
             </div>
 
