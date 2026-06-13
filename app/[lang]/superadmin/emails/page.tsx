@@ -97,7 +97,7 @@ export default function SuperAdminBroadcast({ params }: { params: Promise<{ lang
         {/* TAB CONTROLS */}
         <div className="flex bg-slate-200 p-1 rounded-xl">
           <button onClick={() => setActiveTab('nova')} className={`px-6 py-2.5 rounded-lg font-bold text-sm transition-all ${activeTab === 'nova' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}>Nova Campanha</button>
-          <button onClick={() => setActiveTab('historico')} className={`px-6 py-2.5 rounded-lg font-bold text-sm transition-all ${activeTab === 'historico' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}>Histórico</button>
+          <button onClick={() => setActiveTab('historico')} className={`px-6 py-2.5 rounded-lg font-bold text-sm transition-all ${activeTab === 'historico' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}>Histórico & Tracking</button>
         </div>
       </div>
 
@@ -193,11 +193,14 @@ export default function SuperAdminBroadcast({ params }: { params: Promise<{ lang
         </div>
       )}
 
-      {/* SEPARADOR 2: HISTÓRICO & ANÁLISE */}
+      {/* SEPARADOR 2: HISTÓRICO & ANÁLISE COMPLETA */}
       {activeTab === 'historico' && (
         <div className="bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden">
-          <div className="p-6 border-b border-slate-100 bg-slate-50">
-            <h2 className="text-lg font-black text-slate-900">Histórico de Disparos</h2>
+          <div className="p-6 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+            <div>
+              <h2 className="text-lg font-black text-slate-900">Histórico de Disparos Analítico</h2>
+              <p className="text-xs text-slate-400 font-medium">As métricas atualizam-se automaticamente à medida que os utilizadores interagem.</p>
+            </div>
           </div>
           
           <div className="overflow-x-auto">
@@ -205,33 +208,49 @@ export default function SuperAdminBroadcast({ params }: { params: Promise<{ lang
               <thead className="bg-slate-50 text-xs uppercase text-slate-500 border-b border-slate-200">
                 <tr>
                   <th className="px-6 py-4">Data</th>
-                  <th className="px-6 py-4">Assunto da Campanha</th>
+                  <th className="px-6 py-4">Campanha</th>
                   <th className="px-6 py-4">Público</th>
-                  <th className="px-6 py-4">Alcance (Disparos)</th>
+                  <th className="px-6 py-4">Enviados</th>
+                  <th className="px-6 py-4 text-center">Entregues</th>
+                  <th className="px-6 py-4 text-center text-blue-600">Aberturas</th>
+                  <th className="px-6 py-4 text-center text-emerald-600">Cliques</th>
+                  <th className="px-6 py-4 text-center text-rose-600">Falhas</th>
                   <th className="px-6 py-4 text-right">Ação</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {historico.length === 0 ? (
-                  <tr><td colSpan={5} className="px-6 py-12 text-center text-slate-400 font-bold">Nenhum envio registado ainda.</td></tr>
+                  <tr><td colSpan={9} className="px-6 py-12 text-center text-slate-400 font-bold">Nenhum envio registado ainda.</td></tr>
                 ) : (
-                  historico.map((campanha) => (
-                    <tr key={campanha.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-6 py-4 font-bold">{new Date(campanha.created_at).toLocaleDateString('pt-PT')}</td>
-                      <td className="px-6 py-4 text-slate-900 font-medium">{campanha.assunto}</td>
-                      <td className="px-6 py-4 uppercase text-xs font-bold text-slate-400">{campanha.publico}</td>
-                      <td className="px-6 py-4">
-                        <span className="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full font-bold text-xs">
-                          {campanha.total_enviados} Enviados
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <button onClick={() => reutilizarCampanha(campanha)} className="text-emerald-600 hover:text-emerald-800 font-bold">
-                          Reutilizar Modelo
-                        </button>
-                      </td>
-                    </tr>
-                  ))
+                  historico.map((campanha) => {
+                    const taxaAbertura = campanha.total_enviados > 0 
+                      ? ((campanha.total_abertos / campanha.total_enviados) * 100).toFixed(0) 
+                      : 0;
+
+                    return (
+                      <tr key={campanha.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="px-6 py-4 font-bold text-slate-900">{new Date(campanha.created_at).toLocaleDateString('pt-PT')}</td>
+                        <td className="px-6 py-4">
+                          <p className="font-bold text-slate-900 m-0 max-w-[200px] truncate" title={campanha.assunto}>{campanha.assunto}</p>
+                          <span className="text-[10px] text-slate-400 font-mono block mt-0.5">ID: {campanha.id.substring(0,8)}</span>
+                        </td>
+                        <td className="px-6 py-4"><span className="uppercase text-[10px] font-black tracking-wider text-slate-400 bg-slate-100 px-2 py-1 rounded">{campanha.publico}</span></td>
+                        <td className="px-6 py-4 font-black text-slate-900">{campanha.total_enviados}</td>
+                        <td className="px-6 py-4 text-center font-bold text-slate-700">{campanha.total_entregues || 0}</td>
+                        <td className="px-6 py-4 text-center bg-blue-50/40">
+                          <p className="font-black text-blue-700 m-0">{campanha.total_abertos || 0}</p>
+                          <span className="text-[10px] text-blue-500 font-bold">{taxaAbertura}% taxa</span>
+                        </td>
+                        <td className="px-6 py-4 text-center font-black text-emerald-700 bg-emerald-50/30">{campanha.total_cliques || 0}</td>
+                        <td className="px-6 py-4 text-center font-black text-rose-600">{campanha.total_falhas || 0}</td>
+                        <td className="px-6 py-4 text-right">
+                          <button onClick={() => reutilizarCampanha(campanha)} className="bg-slate-900 text-white font-bold text-xs px-3 py-2 rounded-lg hover:bg-emerald-600 transition-colors">
+                            Reutilizar
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })
                 )}
               </tbody>
             </table>
