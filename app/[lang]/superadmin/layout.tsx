@@ -67,6 +67,9 @@ export default function SuperAdminLayout({
           <Link href={`/${lang}/superadmin/faturacao`} style={navStyle(pathname.includes('/faturacao'))}>
             💰 Faturação Global
           </Link>
+          <Link href={`/${lang}/superadmin/emails`} style={navStyle(pathname.includes('/emails'))}>
+            📧 Email Marketing
+          </Link>
         </nav>
       </aside>
 
