@@ -74,14 +74,15 @@ export default function DashboardMarketing({ params }: { params: Promise<{ lang:
           totalComReviews++;
         }
 
+        // REDIRECIONAMENTO ATUALIZADO PARA A PÁGINA DO CONTRATO
         if (!c.contrato_parceiro_url) {
           novasSugestoes.push({ 
-            tipo: 'warning', 
-            icon: '⏳', 
-            titulo: isEn ? 'Contract Pending' : 'Em Validação',
-            texto: isEn ? `The camp "${c.nome}" is hidden. Waiting for HelloCamp validation.` : `O campo "${c.nome}" está invisível e aguarda validação da equipa HelloCamp.`, 
-            link: `/${lang}/admin/campos/editar/${c.id}`,
-            actionText: isEn ? 'Check Status' : 'Ver Estado'
+            tipo: 'critical', 
+            icon: '📝', 
+            titulo: isEn ? 'Contract Signature Required' : 'Assinatura de Contrato Pendente',
+            texto: isEn ? `The camp "${c.nome}" needs a signed agreement to be published.` : `O campo "${c.nome}" aguarda a assinatura do Acordo de Parceria para poder ser publicado.`, 
+            link: `/${lang}/admin/contratos/${c.id}`, // <-- Rota para a página de contrato gerada anteriormente
+            actionText: isEn ? 'Review and Sign' : 'Ler e Assinar Contrato'
           });
         }
         
