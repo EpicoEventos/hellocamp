@@ -48,9 +48,28 @@ export async function POST(req: Request) {
     // O Outlook ignora CSS de parágrafos. Temos de converter quebras de linha reais em <br/> de forma forçada.
     const mensagemFormatada = mensagem.replace(/\n/g, '<br/>');
 
+    // 2. REGISTAR O ENVIO NO HISTÓRICO PARA OBTER O ID (Essencial para o Tracking)
+    const { data: novaCampanha, error: dbError } = await supabaseAdmin
+      .from('email_broadcasts')
+      .insert([{
+        assunto,
+        titulo: tituloDaMensagem,
+        mensagem,
+        texto_botao: textoBotao,
+        link_botao: linkBotao,
+        publico,
+        total_enviados: destinatarios.length
+      }])
+      .select('id')
+      .single();
+
+    if (dbError || !novaCampanha) throw new Error("Falha ao registar campanha na Base de Dados.");
+
+    const broadcastId = novaCampanha.id;
     const BATCH_SIZE = 100;
     let totalEnviados = 0;
 
+    // 3. ENVIO EM LOTES DE 100 (BATCH)
     for (let i = 0; i < destinatarios.length; i += BATCH_SIZE) {
       const lote = destinatarios.slice(i, i + BATCH_SIZE);
       
@@ -110,13 +129,23 @@ export async function POST(req: Request) {
                     </tr>
                   </table>
                   
+                  <!-- RODAPÉ E UNSUBSCRIBE -->
                   <table width="100%" border="0" cellpadding="0" cellspacing="0" style="max-width: 600px;">
                     <tr>
                       <td align="center" style="padding-top: 20px;">
-                        <p style="font-size: 12px; color: #94a3b8; line-height: 1.5; margin: 0;">
-                          Este e-mail foi enviado pela HelloCamp.<br/>
-                          Se não deseja receber mais comunicações, contacte-nos através de info@hellocamp.pt.
+                        <p style="font-size: 12px; color: #94a3b8; line-height: 1.5; margin: 0 0 15px 0;">
+                          Este e-mail foi enviado pela HelloCamp.
                         </p>
+                        <!-- BOTÃO UNSUBSCRIBE -->
+                        <table border="0" cellspacing="0" cellpadding="0">
+                          <tr>
+                            <td align="center" bgcolor="#f1f5f9" style="border-radius: 4px; border: 1px solid #e2e8f0;">
+                              <a href="https://www.hellocamp.pt/unsubscribe?email=${encodeURIComponent(dest.email)}" target="_blank" style="display: inline-block; padding: 8px 16px; font-family: Arial, sans-serif; font-size: 11px; color: #64748b; text-decoration: none; font-weight: bold; border-radius: 4px;">
+                                Unsubscribe
+                              </a>
+                            </td>
+                          </tr>
+                        </table>
                       </td>
                     </tr>
                   </table>
@@ -129,27 +158,19 @@ export async function POST(req: Request) {
         `;
 
         return {
-          from: 'Equipa HelloCamp <info@hellocamp.pt>', // Mude para o seu email aprovado
+          from: 'Equipa HelloCamp <info@hellocamp.pt>', // Mude para o seu email aprovado no Resend
           to: dest.email,
           subject: assunto,
-          html: htmlContent
+          html: htmlContent,
+          tags: [
+            { name: 'broadcast_id', value: broadcastId } // Tag essencial para o Webhook de tracking
+          ]
         };
       });
 
       await resend.batch.send(mensagensResend);
       totalEnviados += lote.length;
     }
-
-    // REGISTAR O ENVIO NO HISTÓRICO DA BASE DE DADOS
-    await supabaseAdmin.from('email_broadcasts').insert([{
-      assunto,
-      titulo: tituloDaMensagem,
-      mensagem,
-      texto_botao: textoBotao,
-      link_botao: linkBotao,
-      publico,
-      total_enviados: totalEnviados
-    }]);
 
     return NextResponse.json({ success: true, totalEnviados });
 
