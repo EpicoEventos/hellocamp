@@ -33,6 +33,9 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
 
   // Estado para o Modal Detalhado da Reserva
   const [reservaModal, setReservaModal] = useState<any>(null);
+  
+  // NOVO: Estado para gerir o fluxo de Cancelamento dentro da Lightbox
+  const [cancelState, setCancelState] = useState({ loading: false, confirm: false });
 
   // Estados para o Modal de Partilha (Lightbox)
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
@@ -58,7 +61,7 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
     // Busca Plana e Segura de tabelas paralelas
     const { data: perfilData } = await supabase.from('perfis').select('*').eq('id', userId).single();
     const { data: reservasData } = await supabase.from('reservas').select('*').eq('cliente_id', userId).order('created_at', { ascending: false });
-    const { data: camposData } = await supabase.from('campos').select('id, nome, nome_en, imagem, local, local_en, organizador_id, preco');
+    const { data: camposData } = await supabase.from('campos').select('id, nome, nome_en, imagem, local, local_en, organizador_id, preco, politica_cancelamento');
     const { data: criancasData } = await supabase.from('criancas').select('*').eq('cliente_id', userId);
     const { data: wishData } = await supabase.from('wishlists').select('id, nome, token_partilha').eq('user_id', userId).order('created_at', { ascending: false });
 
@@ -160,6 +163,30 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
     }
   };
 
+  // NOVO: Função para Submeter o Pedido de Cancelamento à API
+  const handleCancelarReserva = async (reserva: any) => {
+    setCancelState({ ...cancelState, loading: true });
+    try {
+      const res = await fetch('/api/cancelar-reserva', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reservaId: reserva.id })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro ao cancelar a inscrição.");
+
+      alert(isEn ? "Booking successfully cancelled. The refund logic was applied." : "Inscrição cancelada com sucesso. A regra de reembolso foi aplicada.");
+      
+      setReservaModal(null);
+      setCancelState({ loading: false, confirm: false });
+      fetchData(); // Atualiza o Dashboard com a reserva no estado 'Reembolsado'
+    } catch (err: any) {
+      alert(err.message);
+      setCancelState({ loading: false, confirm: false });
+    }
+  };
+
   const abrirModalPartilha = (token: string, nomeLista: string) => {
     const url = `${window.location.origin}/${lang}/lista/${token}`;
     setShareUrl(url); setShareTitle(nomeLista); setCopied(false); setIsShareModalOpen(true);
@@ -170,6 +197,11 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
       await navigator.clipboard.writeText(shareUrl);
       setCopied(true); setTimeout(() => setCopied(false), 2000);
     } catch (err) {}
+  };
+
+  const fecharReservaModal = () => {
+    setReservaModal(null);
+    setCancelState({ loading: false, confirm: false });
   };
 
   if (loading) return <div className="p-12 text-center text-slate-500 font-bold">{isEn ? 'Loading your dashboard...' : 'A organizar a sua área pessoal...'}</div>;
@@ -399,16 +431,16 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
         </div>
       )}
 
-      {/* MODAL DETALHADO DA RESERVA */}
+      {/* MODAL DETALHADO DA RESERVA E CANCELAMENTO */}
       {reservaModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm transition-opacity" onClick={() => setReservaModal(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm transition-opacity" onClick={fecharReservaModal}>
           <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
               <div>
                 <h3 className="font-black text-slate-900 text-xl m-0">{isEn ? 'Booking Summary' : 'Resumo da Inscrição'}</h3>
                 <p className="text-xs text-slate-500 font-mono mt-1 mb-0">Ref: {reservaModal.id}</p>
               </div>
-              <button onClick={() => setReservaModal(null)} className="w-10 h-10 flex items-center justify-center rounded-full bg-white border border-slate-200 text-slate-500 hover:bg-slate-900 hover:text-white transition-colors">
+              <button onClick={fecharReservaModal} className="w-10 h-10 flex items-center justify-center rounded-full bg-white border border-slate-200 text-slate-500 hover:bg-slate-900 hover:text-white transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
               </button>
             </div>
@@ -499,6 +531,55 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
                   </div>
                 </div>
               </div>
+
+              {/* LÓGICA E AVISO DE CANCELAMENTO */}
+              {reservaModal.status_pagamento !== 'Reembolsado' && reservaModal.status_reembolso !== 'Reembolsado' && (
+                <div className="border-t border-slate-200 pt-6">
+                  {(() => {
+                    const politica = reservaModal.campos?.politica_cancelamento || '';
+                    let avisoCancelamento = '';
+                    if (politica.includes('Flexível')) avisoCancelamento = isEn ? 'Flexible Policy: 100% refund up to 7 days before start.' : 'Política Flexível: Reembolso integral a 100% se estiver a mais de 7 dias do início do campo.';
+                    else if (politica.includes('Moderada')) avisoCancelamento = isEn ? 'Moderate Policy: 50% refund up to 15 days before start.' : 'Política Moderada: Reembolso a 50% se estiver a mais de 15 dias do início do campo.';
+                    else if (politica.includes('Estrita')) avisoCancelamento = isEn ? 'Strict Policy: No refunds allowed.' : 'Política Estrita: Sem direito a reembolso de acordo com as regras da entidade.';
+
+                    return !cancelState.confirm ? (
+                      <button
+                        onClick={() => setCancelState({ loading: false, confirm: true })}
+                        className="w-full py-3 rounded-xl border border-red-200 text-red-600 font-bold hover:bg-red-50 transition-colors"
+                      >
+                        {isEn ? 'Cancel Booking' : 'Cancelar Inscrição'}
+                      </button>
+                    ) : (
+                      <div className="bg-red-50 p-5 rounded-xl border border-red-200 animate-in fade-in zoom-in duration-200">
+                        <h4 className="font-black text-red-800 text-sm mb-2 uppercase tracking-widest flex items-center gap-2">
+                          <span>⚠️</span> {isEn ? 'Confirm Cancellation?' : 'Confirmar Cancelamento?'}
+                        </h4>
+                        <p className="text-red-700 text-sm mb-5 leading-relaxed">
+                          <strong>{isEn ? 'Policy applied: ' : 'Regra Aplicada: '}</strong> {avisoCancelamento} <br/><br/>
+                          {isEn ? 'The final refund will be calculated automatically by Stripe based on today\'s date. This action cannot be undone.' : 'O reembolso final será processado automaticamente pelo sistema com base na data de hoje e nos dias úteis em falta para o início. Esta ação é irreversível.'}
+                        </p>
+                        <div className="flex gap-3">
+                          <button
+                            onClick={() => setCancelState({ loading: false, confirm: false })}
+                            disabled={cancelState.loading}
+                            className="flex-1 py-3 bg-white border border-slate-300 text-slate-700 font-bold rounded-lg hover:bg-slate-50 disabled:opacity-50 transition-colors"
+                          >
+                            {isEn ? 'Keep Booking' : 'Manter Inscrição'}
+                          </button>
+                          <button
+                            onClick={() => handleCancelarReserva(reservaModal)}
+                            disabled={cancelState.loading}
+                            className="flex-1 py-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors shadow-sm"
+                          >
+                            {cancelState.loading ? (isEn ? 'Processing...' : 'A processar...') : (isEn ? 'Confirm Cancel' : 'Confirmar Cancelamento')}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
             </div>
           </div>
         </div>

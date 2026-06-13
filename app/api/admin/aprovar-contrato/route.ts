@@ -14,7 +14,8 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { campoId, status, parceiroEmail, nomeCampo } = body;
+    // Extraímos o lang do body, e se não vier, usamos 'pt' por defeito
+    const { campoId, status, parceiroEmail, nomeCampo, lang = 'pt' } = body;
 
     // Validação básica
     if (!campoId || !status || !parceiroEmail) {
@@ -57,16 +58,15 @@ export async function POST(req: Request) {
     // ==========================================
     if (status === 'Aprovado') {
       
-      // NOTA: Para gerar o PDF real de forma robusta no futuro, pode conectar aqui uma API como a API2PDF 
-      // ou gerar no cliente antes de enviar. Por enquanto, assumimos a ativação lógica do contrato.
-      const urlDocumentoOficial = `https://hellocamp.pt/contratos/aprovado_${campoId}.pdf`;
+      // O lang agora está definido de forma segura
+      const urlDocumentoOficial = `/${lang}/admin/contratos/ver/${campoId}`;
 
       // Atualiza a tabela do campo
       const { error: updateError } = await supabaseAdmin
         .from('campos')
         .update({
           status_aprovacao: 'Aprovado',
-          ativo: true, // Opcional: Torna o campo visível aos pais
+          ativo: true, // Torna o campo visível aos pais
           contrato_parceiro_url: urlDocumentoOficial // Destranca a notificação no Dashboard do Parceiro
         })
         .eq('id', campoId);
@@ -87,7 +87,7 @@ export async function POST(req: Request) {
               <p>O contrato para o programa <strong>${nomeCampo}</strong> foi revisto e validado com sucesso pela nossa equipa legal.</p>
               <p>O seu campo já se encontra ativo na plataforma e pronto a receber inscrições de encarregados de educação.</p>
               <br/>
-              <a href="https://hellocamp.pt/admin/dashboard" style="display: inline-block; background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">
+              <a href="https://hellocamp.pt/${lang}/admin/dashboard" style="display: inline-block; background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">
                 Aceder ao Dashboard
               </a>
               <br/><br/>
