@@ -16,14 +16,14 @@ const PAISES_DESTAQUE = [
   { nome: "Suíça", nome_en: "Switzerland", imagem: "https://images.unsplash.com/photo-1530122037265-a5f1f91d3b99?auto=format&fit=crop&q=80&w=1000", desc: "Montanhas e Lagos", desc_en: "Mountains and Lakes" }
 ];
 
-// ARRAY DE DISTRITOS
+// ARRAY DE DISTRITOS (Imagem de Aveiro corrigida)
 const DISTRITOS_DESTAQUE = [
   { nome: "Lisboa", nome_en: "Lisbon", imagem: "https://images.unsplash.com/photo-1585208798174-6cedd86e019a?auto=format&fit=crop&q=80&w=1000", desc: "Capital Vibrante", desc_en: "Vibrant Capital" },
   { nome: "Porto", nome_en: "Porto", imagem: "https://images.unsplash.com/photo-1555881400-74d7acaacd8b?auto=format&fit=crop&q=80&w=1000", desc: "A Magia do Norte", desc_en: "Northern Magic" },
   { nome: "Faro", nome_en: "Faro", imagem: "https://images.unsplash.com/photo-1533556019545-21d7b322a46c?auto=format&fit=crop&q=80&w=1000", desc: "Praias do Algarve", desc_en: "Algarve Beaches" },
   { nome: "Braga", nome_en: "Braga", imagem: "https://images.unsplash.com/photo-1563806229-37330eb02d33?auto=format&fit=crop&q=80&w=1000", desc: "Cidade Jovem", desc_en: "Youth City" },
   { nome: "Setúbal", nome_en: "Setúbal", imagem: "https://images.unsplash.com/photo-1590500139707-1b0dff17be6c?auto=format&fit=crop&q=80&w=1000", desc: "Serra e Mar", desc_en: "Mountains & Sea" },
-  { nome: "Aveiro", nome_en: "Aveiro", imagem: "https://images.unsplash.com/photo-1627392683050-8b63e9f4eb8d?auto=format&fit=crop&q=80&w=1000", desc: "A Veneza de Portugal", desc_en: "The Venice of Portugal" },
+  { nome: "Aveiro", nome_en: "Aveiro", imagem: "https://images.unsplash.com/photo-1564859228273-274232fdb516?auto=format&fit=crop&q=80&w=1000", desc: "A Veneza de Portugal", desc_en: "The Venice of Portugal" },
   { nome: "Coimbra", nome_en: "Coimbra", imagem: "https://images.unsplash.com/photo-1562947230-0eb5343d9229?auto=format&fit=crop&q=80&w=1000", desc: "História e Saber", desc_en: "History and Knowledge" },
   { nome: "Leiria", nome_en: "Leiria", imagem: "https://images.unsplash.com/photo-1551221156-f56f2f9c572a?auto=format&fit=crop&q=80&w=1000", desc: "Ondas e Litoral", desc_en: "Waves and Coastline" }
 ];
@@ -79,7 +79,7 @@ export default async function Home({
           <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]"></div>
         </div>
         
-        <div className="relative z-10 w-full max-w-5xl mx-auto px-4 md:px-6 flex flex-col items-center mt-8">
+        <div className="relative z-10 w-full max-w-6xl mx-auto px-4 md:px-6 flex flex-col items-center mt-8">
           
           {/* TÍTULOS HERO */}
           <div className="text-center mb-10 md:mb-14 w-full">
@@ -94,15 +94,19 @@ export default async function Home({
           {/* CAIXA DE FILTROS SOBRE A FOTOGRAFIA */}
           <div id="pesquisa" className="relative w-full bg-white rounded-3xl shadow-2xl p-6 md:p-10 border border-white/20 scroll-mt-24">
             
-            {/* BOTÃO VER NO MAPA */}
-            <div className="absolute top-5 right-5 z-20 hidden md:block">
-              <Link href={`/${lang}/mapa`} className="inline-flex items-center gap-2 bg-emerald-50 text-emerald-700 px-4 py-2 rounded-full text-xs font-bold no-underline border border-emerald-100 hover:bg-emerald-100 transition-colors">
-                <span>📍</span> {dict.home.ver_mapa}
-              </Link>
-            </div>
-
-            <form action={`/${lang}/pesquisa`} method="GET" className="relative pb-10 md:pb-4 mt-4 md:mt-0">
+            <form action={`/${lang}/pesquisa`} method="GET" className="relative pb-10 md:pb-4 mt-2">
               
+              {/* TOPO DA CAIXA: TEXTO E BOTÃO MAPA (BEM POSICIONADO) */}
+              <div className="flex justify-between items-end mb-4">
+                <span className="text-sm font-bold text-slate-700 hidden sm:block">
+                  {isEn ? 'Find the perfect program' : 'Encontre o programa ideal'}
+                </span>
+                
+                <Link href={`/${lang}/mapa`} className="inline-flex items-center gap-2 bg-emerald-50 text-emerald-700 px-4 py-2 rounded-full text-xs font-bold no-underline border border-emerald-100 hover:bg-emerald-100 transition-colors shadow-sm ml-auto">
+                  <span>📍</span> {dict.home.ver_mapa}
+                </Link>
+              </div>
+
               {/* 1. BARRA DE TEXTO LIVRE */}
               <div className="mb-6 relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -123,8 +127,8 @@ export default async function Home({
                 <div className="h-px bg-slate-100 flex-1"></div>
               </div>
 
-              {/* 3. DROPDOWNS */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 w-full">
+              {/* 3. DROPDOWNS E DATA */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 w-full">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-900 uppercase tracking-wider mb-2 ml-1">{isEn ? 'Country' : 'País'}</label>
                   <select name="pais" className="w-full appearance-none rounded-xl bg-slate-50 px-4 py-3 text-slate-700 text-sm font-medium outline-none border border-slate-200 focus:border-emerald-500 cursor-pointer">
@@ -156,9 +160,19 @@ export default async function Home({
                     {idadesOpcoes.map((faixa: any) => <option key={faixa.valor} value={faixa.valor}>{faixa.label}</option>)}
                   </select>
                 </div>
+
+                {/* FILTRO DE DATAS */}
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-900 uppercase tracking-wider mb-2 ml-1">{isEn ? 'Starting From' : 'A Partir De'}</label>
+                  <input 
+                    type="date" 
+                    name="data" 
+                    className="w-full appearance-none rounded-xl bg-slate-50 px-4 py-3 text-slate-700 text-sm font-medium outline-none border border-slate-200 focus:border-emerald-500 cursor-pointer"
+                  />
+                </div>
               </div>
 
-              {/* 4. BOTÃO REDONDO AMARELO - FLUTUANTE NA BASE DA CAIXA */}
+              {/* 4. BOTÃO REDONDO AMARELO */}
               <div className="flex justify-center mt-8 md:absolute md:-bottom-[4.5rem] md:left-1/2 md:-translate-x-1/2">
                 <button type="submit" className="group w-full md:w-24 md:h-24 bg-[#EBA914] hover:bg-amber-500 rounded-xl md:rounded-full flex flex-row md:flex-col items-center justify-center gap-2 py-4 shadow-xl shadow-amber-500/40 md:border-[6px] md:border-white transition-transform hover:scale-105 z-20 cursor-pointer">
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
