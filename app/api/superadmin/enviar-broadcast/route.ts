@@ -22,16 +22,12 @@ export async function POST(req: Request) {
 
     let destinatarios: { email: string, nome: string }[] = [];
 
-    // 1. ROTEAR DESTINATÁRIOS: CSV vs Base de Dados
+    // 1. ROTEAR DESTINATÁRIOS
     if (publico === 'csv') {
       if (!emailsManuais || emailsManuais.length === 0) {
         return NextResponse.json({ error: 'O ficheiro anexado não tem e-mails válidos.' }, { status: 400 });
       }
-      destinatarios = emailsManuais.map((email: string) => ({
-        email,
-        nome: 'Amigo' // Nome genérico para CSVs sem colunas de nomes complexas
-      }));
-
+      destinatarios = emailsManuais.map((email: string) => ({ email, nome: 'Amigo' }));
     } else {
       let query = supabaseAdmin.from('perfis').select('email, nome_completo');
       if (publico === 'organizadores') query = query.eq('role', 'organizador');
@@ -49,7 +45,9 @@ export async function POST(req: Request) {
       }));
     }
 
-    // 2. CONSTRUIR O BATCH PARA O RESEND
+    // O Outlook ignora CSS de parágrafos. Temos de converter quebras de linha reais em <br/> de forma forçada.
+    const mensagemFormatada = mensagem.replace(/\n/g, '<br/>');
+
     const BATCH_SIZE = 100;
     let totalEnviados = 0;
 
@@ -58,46 +56,81 @@ export async function POST(req: Request) {
       
       const mensagensResend = lote.map(dest => {
         
-        // TEMPLATE MESTRE HELLOCAMP - Estilo Newsletter
+        // TEMPLATE MESTRE OTIMIZADO PARA OUTLOOK (Totalmente em Tables)
         const htmlContent = `
-          <div style="font-family: 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px; color: #0f172a; background-color: #f8fafc;">
-            <div style="background-color: white; padding: 40px; border-radius: 16px; border: 1px solid #e2e8f0; text-align: center; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
-              
-              <div style="font-size: 28px; font-weight: 900; letter-spacing: -1px; margin-bottom: 30px;">
-                <span style="color: #0f172a;">Hello</span><span style="color: #EBA914;">Camp</span>
-              </div>
-              
-              <h2 style="font-size: 22px; font-weight: 800; color: #0f172a; margin-bottom: 24px; line-height: 1.3;">
-                ${tituloDaMensagem || assunto}
-              </h2>
-              
-              <div style="font-size: 16px; color: #475569; line-height: 1.7; text-align: left; margin-bottom: 35px; white-space: pre-wrap;">
-                Olá ${dest.nome},<br/><br/>${mensagem}
-              </div>
-              
-              ${textoBotao && linkBotao ? `
-                <table width="100%" border="0" cellspacing="0" cellpadding="0">
-                  <tr>
-                    <td align="center">
-                      <a href="${linkBotao}" target="_blank" style="display: inline-block; background-color: #0f172a; color: white; text-decoration: none; padding: 16px 32px; border-radius: 8px; font-weight: bold; font-size: 16px;">
-                        ${textoBotao}
-                      </a>
-                    </td>
-                  </tr>
-                </table>
-              ` : ''}
-              
-            </div>
-            
-            <p style="text-align: center; font-size: 12px; color: #94a3b8; margin-top: 24px; line-height: 1.5;">
-              Este e-mail foi enviado pela HelloCamp.<br/>
-              Se não deseja receber mais comunicações, contacte-nos através de info@hellocamp.pt.
-            </p>
-          </div>
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          </head>
+          <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f8fafc;">
+            <table width="100%" border="0" cellpadding="0" cellspacing="0" style="background-color: #f8fafc; padding: 40px 20px;">
+              <tr>
+                <td align="center">
+                  <table width="100%" border="0" cellpadding="0" cellspacing="0" style="max-width: 600px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px;">
+                    <tr>
+                      <td align="center" style="padding: 40px;">
+                        
+                        <!-- LOGO -->
+                        <div style="font-size: 28px; font-weight: 900; letter-spacing: -1px; margin-bottom: 30px;">
+                          <span style="color: #0f172a;">Hello</span><span style="color: #EBA914;">Camp</span>
+                        </div>
+                        
+                        <!-- TÍTULO -->
+                        <h2 style="font-size: 22px; font-weight: bold; color: #0f172a; margin: 0 0 24px 0; line-height: 1.3;">
+                          ${tituloDaMensagem || assunto}
+                        </h2>
+                        
+                        <!-- MENSAGEM -->
+                        <p style="font-size: 16px; color: #475569; line-height: 1.6; text-align: left; margin: 0 0 30px 0;">
+                          Olá ${dest.nome},<br/><br/>
+                          ${mensagemFormatada}
+                        </p>
+                        
+                        <!-- BOTÃO (Com Tabela Fantasma para Outlook) -->
+                        ${textoBotao && linkBotao ? `
+                          <table width="100%" border="0" cellspacing="0" cellpadding="0">
+                            <tr>
+                              <td align="center">
+                                <table border="0" cellspacing="0" cellpadding="0">
+                                  <tr>
+                                    <td align="center" bgcolor="#0f172a" style="border-radius: 6px;">
+                                      <a href="${linkBotao}" target="_blank" style="display: inline-block; padding: 16px 32px; font-family: Arial, sans-serif; font-size: 16px; color: #ffffff; text-decoration: none; font-weight: bold; border-radius: 6px;">
+                                        ${textoBotao}
+                                      </a>
+                                    </td>
+                                  </tr>
+                                </table>
+                              </td>
+                            </tr>
+                          </table>
+                        ` : ''}
+                        
+                      </td>
+                    </tr>
+                  </table>
+                  
+                  <table width="100%" border="0" cellpadding="0" cellspacing="0" style="max-width: 600px;">
+                    <tr>
+                      <td align="center" style="padding-top: 20px;">
+                        <p style="font-size: 12px; color: #94a3b8; line-height: 1.5; margin: 0;">
+                          Este e-mail foi enviado pela HelloCamp.<br/>
+                          Se não deseja receber mais comunicações, contacte-nos através de info@hellocamp.pt.
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
+                  
+                </td>
+              </tr>
+            </table>
+          </body>
+          </html>
         `;
 
         return {
-          from: 'Equipa HelloCamp <info@hellocamp.pt>', // Deve corresponder ao email verificado no Resend
+          from: 'Equipa HelloCamp <info@hellocamp.pt>', // Mude para o seu email aprovado
           to: dest.email,
           subject: assunto,
           html: htmlContent
@@ -107,6 +140,17 @@ export async function POST(req: Request) {
       await resend.batch.send(mensagensResend);
       totalEnviados += lote.length;
     }
+
+    // REGISTAR O ENVIO NO HISTÓRICO DA BASE DE DADOS
+    await supabaseAdmin.from('email_broadcasts').insert([{
+      assunto,
+      titulo: tituloDaMensagem,
+      mensagem,
+      texto_botao: textoBotao,
+      link_botao: linkBotao,
+      publico,
+      total_enviados: totalEnviados
+    }]);
 
     return NextResponse.json({ success: true, totalEnviados });
 
