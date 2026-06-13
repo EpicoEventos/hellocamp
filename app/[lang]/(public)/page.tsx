@@ -23,7 +23,7 @@ const DISTRITOS_DESTAQUE = [
   { nome: "Faro", nome_en: "Faro", imagem: "https://images.unsplash.com/photo-1533556019545-21d7b322a46c?auto=format&fit=crop&q=80&w=1000", desc: "Praias do Algarve", desc_en: "Algarve Beaches" },
   { nome: "Braga", nome_en: "Braga", imagem: "https://images.unsplash.com/photo-1563806229-37330eb02d33?auto=format&fit=crop&q=80&w=1000", desc: "Cidade Jovem", desc_en: "Youth City" },
   { nome: "Setúbal", nome_en: "Setúbal", imagem: "https://images.unsplash.com/photo-1590500139707-1b0dff17be6c?auto=format&fit=crop&q=80&w=1000", desc: "Serra e Mar", desc_en: "Mountains & Sea" },
-  { nome: "Aveiro", nome_en: "Aveiro", imagem: "https://images.unsplash.com/photo-1564859228273-274232fdb516?auto=format&fit=crop&q=80&w=1000", desc: "A Veneza de Portugal", desc_en: "The Venice of Portugal" },
+  { nome: "Aveiro", nome_en: "Aveiro", imagem: "https://images.unsplash.com/photo-1645295172512-6773df1b68c9?auto=format&fit=crop&q=80&w=1000", desc: "A Veneza de Portugal", desc_en: "The Venice of Portugal" },
   { nome: "Coimbra", nome_en: "Coimbra", imagem: "https://images.unsplash.com/photo-1562947230-0eb5343d9229?auto=format&fit=crop&q=80&w=1000", desc: "História e Saber", desc_en: "History and Knowledge" },
   { nome: "Leiria", nome_en: "Leiria", imagem: "https://images.unsplash.com/photo-1551221156-f56f2f9c572a?auto=format&fit=crop&q=80&w=1000", desc: "Ondas e Litoral", desc_en: "Waves and Coastline" }
 ];
