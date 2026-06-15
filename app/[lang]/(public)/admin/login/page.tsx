@@ -21,10 +21,10 @@ export default function LoginAdmin({ params }: { params: Promise<{ lang: string 
     setLoading(true);
     setError(null);
 
-    // 1. FORÇAR LIMPEZA DE SESSÕES (Prevenção de Loop de Redirecionamento)
+    // FORÇAR LIMPEZA DE SESSÕES (Prevenção de Loop de Redirecionamento)
     await supabase.auth.signOut();
 
-    // 2. Tenta autenticar na plataforma
+    // Tenta autenticar na plataforma
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -37,18 +37,18 @@ export default function LoginAdmin({ params }: { params: Promise<{ lang: string 
     }
 
     if (authData?.user) {
-      // 3. Procura pela flag 'is_superadmin' exata que definiu no Layout
+      // Procura pela flag 'is_superadmin'
       const { data: perfil } = await supabase
         .from('perfis')
         .select('is_superadmin')
         .eq('id', authData.user.id)
         .single();
 
-      // 4. Encaminha para o HQ se for a direção, ou para o Dashboard normal se for parceiro
+      // Encaminha para o HQ se for a direção, ou para o Dashboard normal se for parceiro
       if (perfil?.is_superadmin === true) {
-        router.push(`/${lang}/superadmin/parceiros`); // Encaminha direto para a primeira aba do HQ
+        router.push(`/${lang}/superadmin/parceiros`);
       } else {
-        router.push(`/${lang}/admin/dashboard`); // Encaminha para o portal do Parceiro
+        router.push(`/${lang}/admin/dashboard`);
       }
     }
   };

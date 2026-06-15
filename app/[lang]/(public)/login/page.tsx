@@ -20,10 +20,9 @@ export default function LoginCliente({ params }: { params: Promise<{ lang: strin
     setLoading(true);
     setError(null);
 
-    // 1. FORÇAR LIMPEZA DE SESSÕES (Prevenção de Loop de Redirecionamento)
+    // FORÇAR LIMPEZA DE SESSÕES (Prevenção de Loop de Redirecionamento)
     await supabase.auth.signOut();
 
-    // 2. Tentar nova autenticação limpa
     const { error: authError } = await supabase.auth.signInWithPassword({
       email,
       password,
