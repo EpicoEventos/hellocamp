@@ -36,7 +36,7 @@ export async function POST(req: Request) {
       const { data: utilizadores, error } = await query;
       if (error) throw error;
       if (!utilizadores || utilizadores.length === 0) {
-        return NextResponse.json({ error: 'Nenhum utilizador encontrado para este público.' }, { status: 404 });
+        return NextResponse.json({ error: 'Nenhum utilizador encontrado.' }, { status: 404 });
       }
 
       destinatarios = utilizadores.filter(u => u.email).map(u => ({
@@ -45,10 +45,20 @@ export async function POST(req: Request) {
       }));
     }
 
-    // O Outlook ignora CSS de parágrafos. Temos de converter quebras de linha reais em <br/> de forma forçada.
+    // 1.5 FILTRAR UNSUBSCRIBES
+    const { data: listaNegraData } = await supabaseAdmin.from('unsubscribes').select('email');
+    if (listaNegraData && listaNegraData.length > 0) {
+      const listaNegraEmails = listaNegraData.map(u => u.email.toLowerCase());
+      destinatarios = destinatarios.filter(d => !listaNegraEmails.includes(d.email.toLowerCase()));
+    }
+    
+    if (destinatarios.length === 0) {
+      return NextResponse.json({ error: 'Nenhum destinatário válido após aplicação da lista de remoções (Unsubscribe).' }, { status: 400 });
+    }
+
     const mensagemFormatada = mensagem.replace(/\n/g, '<br/>');
 
-    // 2. REGISTAR O ENVIO NO HISTÓRICO PARA OBTER O ID (Essencial para o Tracking)
+    // 2. REGISTAR CAMPANHA
     const { data: novaCampanha, error: dbError } = await supabaseAdmin
       .from('email_broadcasts')
       .insert([{
@@ -69,20 +79,15 @@ export async function POST(req: Request) {
     const BATCH_SIZE = 100;
     let totalEnviados = 0;
 
-    // 3. ENVIO EM LOTES DE 100 (BATCH)
+    // 3. ENVIAR EM BATCH
     for (let i = 0; i < destinatarios.length; i += BATCH_SIZE) {
       const lote = destinatarios.slice(i, i + BATCH_SIZE);
       
       const mensagensResend = lote.map(dest => {
-        
-        // TEMPLATE MESTRE OTIMIZADO PARA OUTLOOK (Totalmente em Tables)
         const htmlContent = `
           <!DOCTYPE html>
           <html>
-          <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          </head>
+          <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
           <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f8fafc;">
             <table width="100%" border="0" cellpadding="0" cellspacing="0" style="background-color: #f8fafc; padding: 40px 20px;">
               <tr>
@@ -90,23 +95,15 @@ export async function POST(req: Request) {
                   <table width="100%" border="0" cellpadding="0" cellspacing="0" style="max-width: 600px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px;">
                     <tr>
                       <td align="center" style="padding: 40px;">
-                        
-                        <!-- LOGO -->
                         <div style="font-size: 28px; font-weight: 900; letter-spacing: -1px; margin-bottom: 30px;">
                           <span style="color: #0f172a;">Hello</span><span style="color: #EBA914;">Camp</span>
                         </div>
-                        
-                        <!-- TÍTULO -->
                         <h2 style="font-size: 22px; font-weight: bold; color: #0f172a; margin: 0 0 24px 0; line-height: 1.3;">
                           ${tituloDaMensagem || assunto}
                         </h2>
-                        
-                        <!-- MENSAGEM -->
                         <p style="font-size: 16px; color: #475569; line-height: 1.6; text-align: left; margin: 0 0 30px 0;">
                           ${mensagemFormatada}
                         </p>
-                        
-                        <!-- BOTÃO (Com Tabela Fantasma para Outlook) -->
                         ${textoBotao && linkBotao ? `
                           <table width="100%" border="0" cellspacing="0" cellpadding="0">
                             <tr>
@@ -124,19 +121,13 @@ export async function POST(req: Request) {
                             </tr>
                           </table>
                         ` : ''}
-                        
                       </td>
                     </tr>
                   </table>
-                  
-                  <!-- RODAPÉ E UNSUBSCRIBE -->
                   <table width="100%" border="0" cellpadding="0" cellspacing="0" style="max-width: 600px;">
                     <tr>
                       <td align="center" style="padding-top: 20px;">
-                        <p style="font-size: 12px; color: #94a3b8; line-height: 1.5; margin: 0 0 15px 0;">
-                          Este e-mail foi enviado pela HelloCamp.
-                        </p>
-                        <!-- BOTÃO UNSUBSCRIBE -->
+                        <p style="font-size: 12px; color: #94a3b8; line-height: 1.5; margin: 0 0 15px 0;">Este e-mail foi enviado pela HelloCamp.</p>
                         <table border="0" cellspacing="0" cellpadding="0">
                           <tr>
                             <td align="center" bgcolor="#f1f5f9" style="border-radius: 4px; border: 1px solid #e2e8f0;">
@@ -149,7 +140,6 @@ export async function POST(req: Request) {
                       </td>
                     </tr>
                   </table>
-                  
                 </td>
               </tr>
             </table>
@@ -158,13 +148,11 @@ export async function POST(req: Request) {
         `;
 
         return {
-          from: 'Equipa HelloCamp <info@hellocamp.pt>', // Mude para o seu email aprovado no Resend
+          from: 'Equipa HelloCamp <info@hellocamp.pt>',
           to: dest.email,
           subject: assunto,
           html: htmlContent,
-          tags: [
-            { name: 'broadcast_id', value: broadcastId } // Tag essencial para o Webhook de tracking
-          ]
+          tags: [{ name: 'broadcast_id', value: broadcastId }]
         };
       });
 

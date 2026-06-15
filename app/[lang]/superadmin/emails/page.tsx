@@ -94,7 +94,6 @@ export default function SuperAdminBroadcast({ params }: { params: Promise<{ lang
           <p className="text-slate-500 font-medium">Crie campanhas ou comunique avisos à sua base de dados.</p>
         </div>
         
-        {/* TAB CONTROLS */}
         <div className="flex bg-slate-200 p-1 rounded-xl">
           <button onClick={() => setActiveTab('nova')} className={`px-6 py-2.5 rounded-lg font-bold text-sm transition-all ${activeTab === 'nova' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}>Nova Campanha</button>
           <button onClick={() => setActiveTab('historico')} className={`px-6 py-2.5 rounded-lg font-bold text-sm transition-all ${activeTab === 'historico' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}>Histórico & Tracking</button>
@@ -104,7 +103,6 @@ export default function SuperAdminBroadcast({ params }: { params: Promise<{ lang
       {activeTab === 'nova' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           
-          {/* LADO ESQUERDO: FORMULÁRIO */}
           <form onSubmit={handleEnviar} className="bg-white border border-slate-200 p-6 md:p-8 rounded-3xl shadow-sm flex flex-col gap-6">
             <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200">
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Público-Alvo</label>
@@ -155,7 +153,6 @@ export default function SuperAdminBroadcast({ params }: { params: Promise<{ lang
             </button>
           </form>
 
-          {/* LADO DIREITO: PRÉ-VISUALIZAÇÃO AMPLIADA */}
           <div className="flex flex-col h-full">
             <div className="flex justify-between items-center mb-4">
               <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Pré-Visualização em Tempo Real</span>
@@ -167,25 +164,20 @@ export default function SuperAdminBroadcast({ params }: { params: Promise<{ lang
             
             <div className={`bg-slate-100 border border-slate-200 rounded-3xl p-4 sm:p-8 flex-1 flex justify-center items-start transition-all overflow-y-auto min-h-[600px]`}>
               <div className={`bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col p-8 md:p-12 text-center border border-slate-200 w-full transition-all duration-300 ${previewMode === 'mobile' ? 'max-w-[375px]' : 'max-w-[600px]'}`}>
-                
                 <div className="text-2xl font-black tracking-tighter mb-8 font-sans border-b border-slate-100 pb-6">
                   <span className="text-slate-900">Hello</span><span className="text-[#EBA914]">Camp</span>
                 </div>
-                
                 <h2 className="text-xl md:text-2xl font-bold text-slate-900 mb-6 leading-snug">
                   {form.tituloDaMensagem || 'O Título do seu E-mail aparece aqui'}
                 </h2>
-                
                 <p className="text-base text-slate-600 mb-8 leading-relaxed whitespace-pre-wrap text-left min-h-[100px]">
-                  {form.mensagem || 'A sua mensagem será adaptada e enviada a cada contacto da lista, com design profissional à prova de Outlook.'}
+                  {form.mensagem || 'A sua mensagem será adaptada e enviada a cada contacto da lista.'}
                 </p>
-
                 {form.textoBotao && form.linkBotao && (
                   <div className="bg-slate-900 text-white font-bold px-8 py-4 rounded-xl mx-auto inline-block">
                     {form.textoBotao}
                   </div>
                 )}
-                
                 <p className="text-xs text-slate-400 mt-12 pt-6 border-t border-slate-100">Este e-mail foi enviado pela HelloCamp.</p>
               </div>
             </div>
@@ -193,7 +185,6 @@ export default function SuperAdminBroadcast({ params }: { params: Promise<{ lang
         </div>
       )}
 
-      {/* SEPARADOR 2: HISTÓRICO & ANÁLISE COMPLETA */}
       {activeTab === 'historico' && (
         <div className="bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden">
           <div className="p-6 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
