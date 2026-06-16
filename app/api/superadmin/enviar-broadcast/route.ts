@@ -73,7 +73,7 @@ export async function POST(req: Request) {
     if (dbError || !novaCampanha) throw new Error("Falha ao registar campanha na Base de Dados.");
 
     const broadcastId = novaCampanha.id;
-    const BATCH_SIZE = 50; // Reduzido para 50 para garantir fluidez perfeita na API nativa
+    const BATCH_SIZE = 50; 
     let totalEnviados = 0;
 
     const apiKey = process.env.BREVO_API_KEY;
@@ -83,7 +83,7 @@ export async function POST(req: Request) {
     for (let i = 0; i < destinatarios.length; i += BATCH_SIZE) {
       const lote = destinatarios.slice(i, i + BATCH_SIZE);
       
-      const promessasEnvio = lote.map(dest => {
+      const promessasEnvio = lote.map(async (dest) => {
         const htmlContent = `
           <!DOCTYPE html>
           <html>
@@ -147,8 +147,7 @@ export async function POST(req: Request) {
           </html>
         `;
 
-        // Comunicação direta com a API da Brevo
-        return fetch('https://api.brevo.com/v3/smtp/email', {
+        const response = await fetch('https://api.brevo.com/v3/smtp/email', {
           method: 'POST',
           headers: {
             'api-key': apiKey,
@@ -160,12 +159,19 @@ export async function POST(req: Request) {
             to: [{ email: dest.email, name: dest.nome }],
             subject: assunto,
             htmlContent: htmlContent,
-            tags: [broadcastId] // Tag essencial para as estatísticas funcionarem
+            tags: [broadcastId]
           })
         });
+
+        // AQUI ESTÁ A CORREÇÃO: Capturamos o erro real da Brevo
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(`Brevo rejeitou o envio: ${errorData.message || JSON.stringify(errorData)}`);
+        }
+
+        return response.json();
       });
 
-      // Dispara o lote atual de forma concorrente para não bloquear o servidor
       await Promise.all(promessasEnvio);
       totalEnviados += lote.length;
     }
