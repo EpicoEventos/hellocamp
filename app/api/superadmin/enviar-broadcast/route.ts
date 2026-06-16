@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { Resend } from 'resend';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,8 +7,6 @@ const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
-
-const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(req: Request) {
   try {
@@ -58,7 +55,7 @@ export async function POST(req: Request) {
 
     const mensagemFormatada = mensagem.replace(/\n/g, '<br/>');
 
-    // 2. REGISTAR CAMPANHA
+    // 2. REGISTAR CAMPANHA NA BASE DE DADOS
     const { data: novaCampanha, error: dbError } = await supabaseAdmin
       .from('email_broadcasts')
       .insert([{
@@ -76,14 +73,17 @@ export async function POST(req: Request) {
     if (dbError || !novaCampanha) throw new Error("Falha ao registar campanha na Base de Dados.");
 
     const broadcastId = novaCampanha.id;
-    const BATCH_SIZE = 100;
+    const BATCH_SIZE = 50; // Reduzido para 50 para garantir fluidez perfeita na API nativa
     let totalEnviados = 0;
 
-    // 3. ENVIAR EM BATCH
+    const apiKey = process.env.BREVO_API_KEY;
+    if (!apiKey) throw new Error("A chave API da Brevo não está configurada no servidor.");
+
+    // 3. ENVIAR EM BATCH VIA BREVO REST API
     for (let i = 0; i < destinatarios.length; i += BATCH_SIZE) {
       const lote = destinatarios.slice(i, i + BATCH_SIZE);
       
-      const mensagensResend = lote.map(dest => {
+      const promessasEnvio = lote.map(dest => {
         const htmlContent = `
           <!DOCTYPE html>
           <html>
@@ -147,23 +147,33 @@ export async function POST(req: Request) {
           </html>
         `;
 
-        return {
-          from: 'Equipa HelloCamp <info@hellocamp.pt>',
-          to: dest.email,
-          subject: assunto,
-          html: htmlContent,
-          tags: [{ name: 'broadcast_id', value: broadcastId }]
-        };
+        // Comunicação direta com a API da Brevo
+        return fetch('https://api.brevo.com/v3/smtp/email', {
+          method: 'POST',
+          headers: {
+            'api-key': apiKey,
+            'content-type': 'application/json',
+            'accept': 'application/json'
+          },
+          body: JSON.stringify({
+            sender: { name: 'Equipa HelloCamp', email: 'info@hellocamp.pt' },
+            to: [{ email: dest.email, name: dest.nome }],
+            subject: assunto,
+            htmlContent: htmlContent,
+            tags: [broadcastId] // Tag essencial para as estatísticas funcionarem
+          })
+        });
       });
 
-      await resend.batch.send(mensagensResend);
+      // Dispara o lote atual de forma concorrente para não bloquear o servidor
+      await Promise.all(promessasEnvio);
       totalEnviados += lote.length;
     }
 
     return NextResponse.json({ success: true, totalEnviados });
 
   } catch (error: any) {
-    console.error("Erro no broadcast:", error);
+    console.error("Erro no broadcast (Brevo):", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
