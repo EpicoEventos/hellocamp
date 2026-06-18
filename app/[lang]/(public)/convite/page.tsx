@@ -157,8 +157,8 @@ export default function ConviteParceiroPage({ params }: { params: Promise<{ lang
                 </h3>
                 <p className="text-sm sm:text-base text-slate-600 text-justify leading-relaxed">
                   {isEn 
-                    ? 'Congratulations! You have entered into a partnership agreement with HelloCamp. This contract regulates the promotion and intermediation of your offers through the HelloCamp platform, establishing the terms of collaboration between both parties. The agreement remains valid until the end of the current calendar year and is automatically renewed for successive periods, unless terminated by either party under the contractual terms.' 
-                    : 'Parabéns! Celebrou um contrato de parceria com a HelloCamp. Este contrato regula a divulgação e a intermediação das suas ofertas através da plataforma HelloCamp, estabelecendo os termos da colaboração entre ambas as partes. O acordo mantém-se válido até ao final do ano civil em curso, sendo automaticamente renovado por períodos sucessivos, salvo denúncia por qualquer uma das partes nos termos previstos contratualmente.'}
+                    ? 'This contract regulates the promotion and intermediation of your offers through the HelloCamp platform, establishing the terms of collaboration between both parties. The agreement remains valid until the end of the current calendar year and is automatically renewed for successive periods, unless terminated by either party under the contractual terms.' 
+                    : 'Este contrato regula a divulgação e a intermediação das suas ofertas através da plataforma HelloCamp, estabelecendo os termos da colaboração entre ambas as partes. O acordo mantém-se válido até ao final do ano civil em curso, sendo automaticamente renovado por períodos sucessivos, salvo denúncia por qualquer uma das partes nos termos previstos contratualmente.'}
                 </p>
               </div>
             </div>
