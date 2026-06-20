@@ -16,12 +16,15 @@ export default function RegistoCliente({ params }: { params: Promise<{ lang: str
   const [nome, setNome] = useState("");
   const [loading, setLoading] = useState(false);
   const [sucesso, setSucesso] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleRegisto = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
 
-    const { error } = await supabase.auth.signUp({
+    // 1. Criar Auth
+    const { data: authData, error: authError } = await supabase.auth.signUp({
       email, 
       password,
       options: {
@@ -33,9 +36,35 @@ export default function RegistoCliente({ params }: { params: Promise<{ lang: str
       }
     });
 
-    if (error) alert(error.message);
-    else setSucesso(true);
+    if (authError) {
+      setError(authError.message);
+      setLoading(false);
+      return;
+    }
+
+    // 2. Gravar no perfil público para ter acesso imediato
+    if (authData.user) {
+      await supabase.from('perfis').upsert({
+        id: authData.user.id,
+        email: email,
+        nome_completo: nome,
+        role: 'cliente'
+      });
+    }
+
+    // 3. Disparar o Email (a nossa API unificada agora processa isto graças ao 'role')
+    fetch('/api/notificacoes/boas-vindas', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        email: email, 
+        nome: nome, 
+        role: 'cliente', 
+        lang: lang 
+      })
+    }).catch(err => console.error("Falha ao enviar e-mail de boas-vindas:", err));
     
+    setSucesso(true);
     setLoading(false);
   };
 
@@ -48,10 +77,12 @@ export default function RegistoCliente({ params }: { params: Promise<{ lang: str
 
         {sucesso ? (
           <div style={{ backgroundColor: '#ecfdf5', color: '#065f46', padding: '1rem', borderRadius: '0.5rem', textAlign: 'center', fontWeight: 'bold' }}>
-            {isEn ? 'Check your email to verify your account.' : 'Verifique o seu email para ativar a conta.'}
+            {isEn ? 'Check your email to verify your account.' : 'Verifique o seu email (e a pasta de SPAM) para ativar a conta.'}
           </div>
         ) : (
           <form onSubmit={handleRegisto} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {error && <div style={{ color: '#dc2626', backgroundColor: '#fef2f2', padding: '0.75rem', borderRadius: '0.5rem', fontSize: '13px', fontWeight: 'bold' }}>{error}</div>}
+            
             <input type="text" placeholder={isEn ? 'Full Name' : 'Nome Completo'} required onChange={e => setNome(e.target.value)} style={inputStyle} />
             <input type="email" placeholder="E-mail" required onChange={e => setEmail(e.target.value)} style={inputStyle} />
             <input type="password" placeholder="Password" minLength={6} required onChange={e => setPassword(e.target.value)} style={inputStyle} />

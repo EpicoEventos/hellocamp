@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, use } from "react";
-import { supabase } from "@/lib/supabase"; // Ajuste o caminho se necessário
+import { supabase } from "@/lib/supabase"; 
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import React from "react";
@@ -23,13 +23,14 @@ export default function RegistoAdmin({ params }: { params: Promise<{ lang: strin
     setLoading(true);
     setError(null);
 
-    const { data, error: authError } = await supabase.auth.signUp({
+    // 1. Criar o Utilizador no Supabase Auth
+    const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: {
-          empresa_nome: nomeEmpresa, // Variável que a Faturação e os Emails procuram
-          role: 'organizador'        // <--- Crucial para a BD saber que é Parceiro B2B
+          empresa_nome: nomeEmpresa,
+          role: 'organizador'
         },
         emailRedirectTo: `${window.location.origin}/${lang}/admin/login`
       }
@@ -40,6 +41,28 @@ export default function RegistoAdmin({ params }: { params: Promise<{ lang: strin
       setLoading(false);
       return;
     }
+
+    // 2. Gravar explicitamente na tabela 'perfis' para aparecer no Superadmin!
+    if (authData.user) {
+      const { error: perfilError } = await supabase.from('perfis').upsert({
+        id: authData.user.id,
+        email: email,
+        empresa_nome: nomeEmpresa,
+        role: 'organizador',
+        parceiro_verificado: false
+      });
+
+      if (perfilError) {
+        console.error("Aviso: Falha ao guardar perfil público:", perfilError);
+      }
+    }
+
+    // 3. Disparar API do Email de Boas-Vindas (Não usamos await para não bloquear o ecrã)
+    fetch('/api/notificacoes/boas-vindas', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, nomeEmpresa, lang })
+    }).catch(err => console.error("Falha ao pedir envio de email:", err));
 
     setSucesso(true);
     setLoading(false);
