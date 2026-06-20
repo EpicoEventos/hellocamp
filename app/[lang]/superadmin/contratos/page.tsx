@@ -26,7 +26,7 @@ export default function GestaoContratosHQ({ params }: { params: Promise<{ lang: 
   const fetchContratos = async () => {
     const { data } = await supabase
       .from('campos')
-      .select('id, nome, contrato_dados, status_aprovacao, taxa_comissao')
+      .select('id, nome, contrato_dados, status_aprovacao, taxa_comissao, ativo')
       .order('id', { ascending: false });
       
     setContratos(data || []);
@@ -45,16 +45,22 @@ export default function GestaoContratosHQ({ params }: { params: Promise<{ lang: 
   const handleAcaoContrato = async (id: string, novoStatus: string) => {
     const isApproved = novoStatus === 'Aprovado';
     
-    const updatePayload: any = { status_aprovacao: novoStatus };
+    // A grande alteração: Garantir que se não for "Aprovado", o ativo passa a FALSE e o link do contrato é removido
+    const updatePayload: any = { 
+      status_aprovacao: novoStatus,
+      ativo: isApproved 
+    };
+
     if (isApproved) {
       updatePayload.contrato_parceiro_url = `https://hellocamp.pt/contratos/aprovado_${id}.pdf`;
-      updatePayload.ativo = true;
+    } else {
+      updatePayload.contrato_parceiro_url = null;
     }
 
     const { error } = await supabase.from('campos').update(updatePayload).eq('id', id);
 
     if (error) {
-      alert("Erro ao atualizar: " + error.message);
+      alert("Erro ao atualizar base de dados: " + error.message);
     } else {
       try {
         const dados = modalContrato?.contrato_dados || {};
@@ -74,8 +80,8 @@ export default function GestaoContratosHQ({ params }: { params: Promise<{ lang: 
         console.error("Erro ao notificar parceiro da alteração de estado:", err);
       }
 
-      alert(`Contrato ${novoStatus} com sucesso e parceiro notificado!`);
-      setModalContrato((prev: any) => ({ ...prev, status_aprovacao: novoStatus }));
+      alert(`Sucesso! Contrato alterado para ${novoStatus}. O campo está agora ${isApproved ? 'ATIVO' : 'OCULTO'} no site público.`);
+      setModalContrato((prev: any) => ({ ...prev, status_aprovacao: novoStatus, ativo: isApproved }));
       fetchContratos();
     }
   };
@@ -125,7 +131,6 @@ export default function GestaoContratosHQ({ params }: { params: Promise<{ lang: 
     const dados = modalContrato.contrato_dados;
     const comissaoText = modalContrato.taxa_comissao || 12;
     const dataContrato = dados.dataSubmissao ? new Date(dados.dataSubmissao).toLocaleDateString('pt-PT', { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/D';
-    const horaContrato = dados.dataSubmissao ? new Date(dados.dataSubmissao).toLocaleTimeString('pt-PT') : '';
     
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
@@ -133,7 +138,6 @@ export default function GestaoContratosHQ({ params }: { params: Promise<{ lang: 
       return;
     }
 
-    // Textos Dinâmicos dos Anexos Baseados nas Escolhas
     let anexo1Text = dados.modalidadeReserva === 'direta' 
       ? "<strong>Reserva Direta com Pagamento Automático (Recomendado):</strong> As reservas efetuadas através da plataforma HelloCamp serão registadas diretamente no sistema de reservas do Parceiro. Nesta modalidade, a HelloCamp terá direito à comissão acordada sobre cada reserva concluída. O formulário de reserva será configurado de acordo com as necessidades do Parceiro, recolhendo as informações necessárias para a correta gestão das inscrições. O Parceiro compromete-se a manter atualizadas as disponibilidades, preços e demais informações relevantes das atividades disponibilizadas através da plataforma."
       : "<strong>Comunicação por E-mail (Reserva Sob Consulta):</strong> A HelloCamp enviará ao Parceiro, por correio eletrónico, todas as informações necessárias para a gestão da reserva, incluindo os dados do participante, os dados do responsável pela reserva e os detalhes da atividade reservada. O Parceiro dispõe de 2 (dois) dias úteis para comunicar à HelloCamp a rejeição de uma reserva por motivo devidamente justificado. Na ausência de resposta dentro deste prazo, a reserva considerar-se-á aceite, sendo aplicável a comissão prevista no contrato.";
@@ -348,7 +352,7 @@ export default function GestaoContratosHQ({ params }: { params: Promise<{ lang: 
               <tr>
                 <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Campo</th>
                 <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Entidade</th>
-                <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Comissão</th>
+                <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Visibilidade</th>
                 <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Estado</th>
                 <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Ações</th>
               </tr>
@@ -369,7 +373,9 @@ export default function GestaoContratosHQ({ params }: { params: Promise<{ lang: 
                       {dados.empresaNome || 'N/D'}
                       <div className="text-[10px] text-slate-400 mt-1">{dados.dataSubmissao ? new Date(dados.dataSubmissao).toLocaleDateString('pt-PT') : ''}</div>
                     </td>
-                    <td className="p-4 text-sm font-bold text-slate-700">{c.taxa_comissao || 12}%</td>
+                    <td className="p-4 text-sm font-bold text-slate-700">
+                      {c.ativo ? <span className="text-emerald-600 font-bold">● Público</span> : <span className="text-slate-400 font-medium">○ Oculto</span>}
+                    </td>
                     <td className="p-4">
                       <span className={`text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full ${statusColor}`}>
                         {c.status_aprovacao}
