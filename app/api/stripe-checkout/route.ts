@@ -10,32 +10,66 @@ export async function POST(req: Request) {
   
   const stripe = new Stripe(stripeSecretKey);
 
-  // Inicializar o Supabase no lado do servidor para consultar a comissão
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
   const supabase = createClient(supabaseUrl, supabaseKey);
 
   try {
     const body = await req.json();
-    // Certifique-se que o seu frontend envia o campoId para sabermos de que campo estamos a falar
     const { reservasIds, totalAmount, userEmail, lang, campoNome, stripeAccountId, tipoPagamento, campoId } = body;
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.hellocamp.pt';
 
-    // 1. Obter a comissão real da base de dados (Ex: 12%)
-    let taxaComissao = 0.12; // Valor default de segurança
+    // 1. Obter a comissão e o organizador_id do campo na base de dados
+    let taxaComissao = 0.12; 
+    let organizadorId = null;
+    
     if (campoId) {
       const { data: campoData } = await supabase
         .from('campos')
-        .select('comissao')
+        .select('comissao, organizador_id')
         .eq('id', campoId)
         .single();
         
-      if (campoData && campoData.comissao) {
-        // Se na BD a comissão estiver como 12, transformamos em 0.12 para a matemática
-        taxaComissao = campoData.comissao / 100;
+      if (campoData) {
+        organizadorId = campoData.organizador_id;
+        if (campoData.comissao) {
+          taxaComissao = campoData.comissao / 100;
+        }
       }
     }
 
+    // 👉 NOVA PARTE: DISPARO AUTOMÁTICO DE MENSAGEM LOGÍSTICA NA INBOX
+    try {
+      if (reservasIds && reservasIds.length > 0 && campoId && organizadorId) {
+        // Puxamos o cliente_id de uma das reservas criadas
+        const { data: resData } = await supabase
+          .from('reservas')
+          .select('cliente_id')
+          .eq('id', reservasIds[0])
+          .single();
+
+        if (resData?.cliente_id) {
+          const isSinal = tipoPagamento === '50_sinal';
+          const msgTexto = isSinal 
+            ? `📢 Nova intenção de inscrição iniciada! O cliente escolheu pagar sinal de 50%. A aguardar conclusão na Stripe. (Ref Reservas: ${reservasIds.join(', ')})`
+            : `📢 Nova intenção de inscrição iniciada! O cliente escolheu pagar 100% da totalidade. A aguardar conclusão na Stripe. (Ref Reservas: ${reservasIds.join(', ')})`;
+
+          // Grava a mensagem do sistema na tabela unificada de mensagens
+          await supabase.from('mensagens').insert([{
+            campo_id: campoId,
+            sender_id: resData.cliente_id, // Atribuído ao pai para abrir a thread dele
+            receiver_id: organizadorId,
+            texto: msgTexto,
+            lida: false
+          }]);
+        }
+      }
+    } catch (chatErr) {
+      // Falha de chat não deve bloquear o checkout financeiro, apenas registamos na consola
+      console.error("Erro em background ao inicializar chat no checkout:", chatErr);
+    }
+
+    // Continuar com a lógica financeira da Stripe
     const isSinal = tipoPagamento === '50_sinal';
     const valorCobrarAgora = isSinal ? (totalAmount / 2) : totalAmount;
     const nomeProdutoStripe = isSinal ? `Sinal (50%) - ${campoNome}` : `Inscrição - ${campoNome}`;
@@ -63,7 +97,6 @@ export async function POST(req: Request) {
 
     if (stripeAccountId) {
       (sessionData as any).payment_intent_data = {
-        // Usa a taxa de comissão dinâmica buscada da BD!
         application_fee_amount: Math.round((valorCobrarAgora * taxaComissao) * 100),
         transfer_data: { destination: stripeAccountId }
       };

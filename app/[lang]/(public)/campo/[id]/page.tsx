@@ -5,8 +5,9 @@ import CaixaReserva from "./CaixaReserva";
 import BotaoFavorito from "../../components/BotaoFavorito";
 import BotaoPartilha from "../../components/BotaoPartilha";
 import { getDictionary } from "@/lib/getDictionary";
+// Importamos o novo formulário interativo de Chat
+import FormContactoCampo from "../../components/FormContactoCampo"; 
 
-// 1. CHEFE DO SEO PARA A PÁGINA DO CAMPO
 export async function generateMetadata({ params }: { params: Promise<{ lang: string; id: string }> }): Promise<Metadata> {
   const { lang, id } = await params;
   const isEn = lang === 'en';
@@ -26,20 +27,15 @@ export async function generateMetadata({ params }: { params: Promise<{ lang: str
 }
 
 export default async function DetalhesDoCampo({ 
-  params,
-  searchParams
+  params
 }: { 
   params: Promise<{ lang: string; id: string }>;
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
   const { lang, id } = await params;
-  const sParams = await searchParams;
-  const showSuccessMessage = sParams?.sucesso_duvida === 'true';
   
   const dict = await getDictionary(lang as "pt" | "en");
   const isEn = lang === 'en';
 
-  // 2. Busca do Campo e Reviews (Inclui agora os dados do contrato)
   const { data: campo } = await supabase.from("campos").select("*").eq("id", id).single();
   const { data: reviews } = await supabase.from("reviews").select("*").eq("campo_id", id).order('created_at', { ascending: false });
 
@@ -52,14 +48,12 @@ export default async function DetalhesDoCampo({
     );
   }
 
-  // 3. Busca Informação do Organizador
   let parceiroInfo = null;
   if (campo.organizador_id) {
     const { data: organizador } = await supabase.from("perfis").select("nome_empresa, logotipo_url, parceiro_verificado").eq("id", campo.organizador_id).single();
     parceiroInfo = organizador;
   }
 
-  // Gatilho de Prova Social Dinâmico
   const viewsHoje = Math.floor(Math.random() * (campo.vagas_totais > 50 ? 25 : 8)) + 2; 
 
   const nomeCampo = isEn && campo.nome_en ? campo.nome_en : campo.nome;
@@ -85,7 +79,6 @@ export default async function DetalhesDoCampo({
 
   const baseUrl = "https://www.hellocamp.pt";
   const campoUrlCompleto = `${baseUrl}/${lang}/campo/${campo.id}`;
-
   const dataMaisCedo = campo.turnos && campo.turnos.length > 0 ? campo.turnos[0].data_inicio : "2026-07-01";
   
   const eventSchema = {
@@ -135,7 +128,6 @@ export default async function DetalhesDoCampo({
 
   return (
     <main className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-24">
-      {/* SCRIPTS INVISÍVEIS PARA SEO */}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(eventSchema) }} />
 
@@ -328,59 +320,19 @@ export default async function DetalhesDoCampo({
               )}
             </div>
 
-            {/* FORMULÁRIO DE CONTACTO */}
+            {/* FORMULÁRIO DE CONTACTO INTELIGENTE LIGADO À INBOX */}
             <div id="duvidas" className="bg-white p-8 md:p-10 rounded-3xl shadow-sm border border-slate-100 relative z-10 scroll-mt-24">
               <h3 className="text-xl font-bold text-slate-900 mb-2">{dict.detalhe.duvidas_titulo}</h3>
               <p className="text-sm text-slate-500 font-medium mb-8">{dict.detalhe.duvidas_sub}</p>
               
-              {showSuccessMessage ? (
-                <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-8 text-center animate-in fade-in zoom-in duration-300">
-                  <span className="text-5xl mb-4 block">✅</span>
-                  <h4 className="text-xl font-black text-emerald-800 mb-2">{isEn ? 'Message Sent Successfully!' : 'Mensagem Enviada com Sucesso!'}</h4>
-                  <p className="text-emerald-700 font-medium">{isEn ? 'The camp organizer will review your question and get back to you shortly.' : 'O organizador do campo irá analisar a sua dúvida e responder diretamente para o seu email brevemente.'}</p>
-                </div>
-              ) : (
-                <form action="/api/enviar-duvida" method="POST" className="flex flex-col gap-6">
-                  <input type="hidden" name="organizador_id" value={campo.organizador_id || ''} />
-                  <input type="hidden" name="_subject" value={`${isEn ? 'Question regarding HelloCamp:' : 'Dúvida sobre o campo HelloCamp:'} ${nomeCampo}`} />
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                    <div className="flex flex-col gap-2">
-                      <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">{dict.detalhe.nome}</label>
-                      <input type="text" name="First_Name" required className="p-3.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-900 outline-none focus:border-emerald-500 transition-colors" />
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">{dict.detalhe.apelido}</label>
-                      <input type="text" name="Last_Name" required className="p-3.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-900 outline-none focus:border-emerald-500 transition-colors" />
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                    <div className="flex flex-col gap-2">
-                      <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">{dict.detalhe.email_encarregado}</label>
-                      <input type="email" name="Email" required className="p-3.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-900 outline-none focus:border-emerald-500 transition-colors" />
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">{dict.detalhe.contacto_telefonico}</label>
-                      <input type="tel" name="Phone" required className="p-3.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-900 outline-none focus:border-emerald-500 transition-colors" />
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col gap-2">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">{dict.detalhe.idade_participante}</label>
-                    <input type="number" name="Age" min="1" required className="p-3.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-900 outline-none focus:border-emerald-500 transition-colors" />
-                  </div>
-
-                  <div className="flex flex-col gap-2">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">{dict.detalhe.mensagem}</label>
-                    <textarea name="Message" rows={4} required className="p-3.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-900 outline-none focus:border-emerald-500 transition-colors resize-none"></textarea>
-                  </div>
-                  
-                  <button type="submit" className="self-start px-8 py-3.5 rounded-xl bg-slate-900 hover:bg-emerald-600 text-white font-bold text-sm transition-colors shadow-sm">
-                    {dict.detalhe.enviar_mensagem}
-                  </button>
-                </form>
-              )}
+              <FormContactoCampo 
+                campoId={campo.id} 
+                organizadorId={campo.organizador_id} 
+                nomeCampo={nomeCampo} 
+                dict={dict} 
+                isEn={isEn} 
+                lang={lang} 
+              />
             </div>
 
           </div>
