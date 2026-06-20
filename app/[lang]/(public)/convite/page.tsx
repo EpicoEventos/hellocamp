@@ -48,6 +48,7 @@ export default function ConviteParceiroPage({ params }: { params: Promise<{ lang
 
     setLoading(true);
 
+    // 1. Criar Utilizador
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: auth.emailAcesso,
       password: auth.passwordAcesso,
@@ -90,6 +91,7 @@ export default function ConviteParceiroPage({ params }: { params: Promise<{ lang
       ipAssinatura: isEn ? "Captured via Unified Registration" : "Capturado via Registo Unificado"
     };
 
+    // 2. Guardar o Campo e Contrato
     const { error: campoError } = await supabase
       .from('campos')
       .insert([
@@ -107,6 +109,18 @@ export default function ConviteParceiroPage({ params }: { params: Promise<{ lang
     if (campoError) {
       alert(isEn ? "Account created, but there was an error attaching the contract. Contact support." : "Conta criada, mas houve um erro ao anexar o contrato. Contacte o suporte.");
     } else {
+      
+      // 3. DISPARAR OS E-MAILS DE NOTIFICAÇÃO (Parceiro + Direção HelloCamp)
+      try {
+        await fetch('/api/notificacoes/novo-contrato', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ form, emailAcesso: auth.emailAcesso, lang })
+        });
+      } catch (err) {
+        console.error("Erro ao enviar emails de notificação", err);
+      }
+
       alert(isEn ? "Contract signed and account successfully created! You can now access your portal." : "Contrato assinado e conta criada com sucesso! Pode agora aceder ao seu portal.");
       router.push(`/${lang}/admin/login`);
     }
