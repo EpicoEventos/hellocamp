@@ -34,7 +34,7 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
   // Estado para o Modal Detalhado da Reserva
   const [reservaModal, setReservaModal] = useState<any>(null);
   
-  // NOVO: Estado para gerir o fluxo de Cancelamento dentro da Lightbox
+  // Estado para gerir o fluxo de Cancelamento dentro da Lightbox
   const [cancelState, setCancelState] = useState({ loading: false, confirm: false });
 
   // Estados para o Modal de Partilha (Lightbox)
@@ -61,7 +61,14 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
     // Busca Plana e Segura de tabelas paralelas
     const { data: perfilData } = await supabase.from('perfis').select('*').eq('id', userId).single();
     const { data: reservasData } = await supabase.from('reservas').select('*').eq('cliente_id', userId).order('created_at', { ascending: false });
-    const { data: camposData } = await supabase.from('campos').select('id, nome, nome_en, imagem, local, local_en, organizador_id, preco, politica_cancelamento');
+    
+    // CRÍTICO: Buscar APENAS campos visíveis e com contrato aprovado para gerar sugestões seguras
+    const { data: camposData } = await supabase
+      .from('campos')
+      .select('id, nome, nome_en, imagem, local, local_en, organizador_id, preco, politica_cancelamento')
+      .eq('status_aprovacao', 'Aprovado')
+      .eq('ativo', true);
+
     const { data: criancasData } = await supabase.from('criancas').select('*').eq('cliente_id', userId);
     const { data: wishData } = await supabase.from('wishlists').select('id, nome, token_partilha').eq('user_id', userId).order('created_at', { ascending: false });
 
@@ -79,8 +86,18 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
     // Cruzamento Manual de Reservas
     const camposCompradosIds: string[] = [];
     if (reservasData) {
+      // Como o camposData agora só tem aprovados, para o cruzamento de reservas (histórico) 
+      // precisamos de buscar os dados do campo específico, mesmo se entretanto tiver sido desativado
+      // É mais seguro fazer um fetch isolado dos IDs da reserva
+      const idsDeCamposReservados = Array.from(new Set(reservasData.map(r => r.campo_id)));
+      
+      const { data: todosCamposHistorico } = await supabase
+        .from('campos')
+        .select('id, nome, nome_en, imagem, local, local_en, organizador_id, preco, politica_cancelamento')
+        .in('id', idsDeCamposReservados);
+
       const reservasCruzadas = reservasData.map(res => {
-        const campo = camposData?.find(c => c.id === res.campo_id) || {};
+        const campo = todosCamposHistorico?.find(c => c.id === res.campo_id) || {};
         const crianca = criancasData?.find(cr => cr.id === res.crianca_id) || {};
         camposCompradosIds.push(res.campo_id);
 
@@ -89,7 +106,7 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
       setReservas(reservasCruzadas);
     }
 
-    // Gerar Sugestões de Conversão
+    // Gerar Sugestões de Conversão (Apenas sobre campos válidos, não comprados)
     if (camposData) {
       const recomendacoes = camposData
         .filter(c => !camposCompradosIds.includes(c.id))
@@ -163,7 +180,6 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
     }
   };
 
-  // NOVO: Função para Submeter o Pedido de Cancelamento à API
   const handleCancelarReserva = async (reserva: any) => {
     setCancelState({ ...cancelState, loading: true });
     try {
@@ -243,7 +259,7 @@ export default function DashboardCliente({ params }: { params: Promise<{ lang: s
         </div>
       )}
 
-      {/* MÓDULO DE SUGESTÕES LIMPO */}
+      {/* MÓDULO DE SUGESTÕES LIMPO E SEGURO (Apenas campos públicos e aprovados) */}
       {sugestoesVerdes.length > 0 && (
         <div className="bg-emerald-50 border border-emerald-100 rounded-3xl p-8 mb-12 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-100 rounded-full blur-3xl opacity-50 -mr-20 -mt-20"></div>
