@@ -61,6 +61,9 @@ export default function SuperAdminLayout({
           <Link href={`/${lang}/superadmin/parceiros`} style={navStyle(pathname.includes('/parceiros'))}>
             🤝 Gestão de Parceiros
           </Link>
+          <Link href={`/${lang}/superadmin/contratos`} style={navStyle(pathname.includes('/contratos'))}>
+            📋 Contratos Recebidos
+          </Link>
           <Link href={`/${lang}/superadmin/campos`} style={navStyle(pathname.includes('/campos'))}>
             🏕️ Todos os Campos (Global)
           </Link>
