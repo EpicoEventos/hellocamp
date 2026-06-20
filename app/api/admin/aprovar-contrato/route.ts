@@ -1,42 +1,27 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
 
-// 1. Inicializa o Supabase com Service Role (Bypass ao RLS para poder editar as tabelas administrativas)
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
-// 2. Inicializa o Resend
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    // Extraímos o lang do body, e se não vier, usamos 'pt' por defeito
-    const { campoId, status, parceiroEmail, nomeCampo, lang = 'pt' } = body;
+    
+    // Nomes exatos que vamos enviar do Superadmin
+    const { parceiroEmail, nomeCampo, status, lang = 'pt' } = body;
 
     // Validação básica
-    if (!campoId || !status || !parceiroEmail) {
-      return NextResponse.json({ error: 'Dados insuficientes fornecidos (campoId, status ou parceiroEmail em falta).' }, { status: 400 });
+    if (!status || !parceiroEmail) {
+      return NextResponse.json({ error: 'Dados insuficientes fornecidos (status ou parceiroEmail em falta).' }, { status: 400 });
     }
 
     // ==========================================
     // FLUXO 1: CONTRATO REJEITADO
     // ==========================================
     if (status === 'Rejeitado') {
-      
-      const { error: updateError } = await supabaseAdmin
-        .from('campos')
-        .update({ status_aprovacao: 'Rejeitado' })
-        .eq('id', campoId);
-
-      if (updateError) throw updateError;
-
-      // Dispara o email de rejeição via Resend
       await resend.emails.send({
-        from: 'HelloCamp Parceiros <parceiros@hellocamp.pt>', // Substitua pelo seu email verificado no Resend
+        // IMPORTANTE: Garanta que este email está verificado na sua conta Resend!
+        from: 'HelloCamp Parceiros <info@hellocamp.pt>', 
         to: parceiroEmail,
         subject: `[HelloCamp] Revisão do Contrato: ${nomeCampo}`,
         html: `
@@ -50,32 +35,15 @@ export async function POST(req: Request) {
         `
       });
 
-      return NextResponse.json({ success: true, message: 'Contrato rejeitado e parceiro notificado.' });
+      return NextResponse.json({ success: true, message: 'Email de rejeição enviado.' });
     }
 
     // ==========================================
     // FLUXO 2: CONTRATO APROVADO
     // ==========================================
     if (status === 'Aprovado') {
-      
-      // O lang agora está definido de forma segura
-      const urlDocumentoOficial = `/${lang}/admin/contratos/ver/${campoId}`;
-
-      // Atualiza a tabela do campo
-      const { error: updateError } = await supabaseAdmin
-        .from('campos')
-        .update({
-          status_aprovacao: 'Aprovado',
-          ativo: true, // Torna o campo visível aos pais
-          contrato_parceiro_url: urlDocumentoOficial // Destranca a notificação no Dashboard do Parceiro
-        })
-        .eq('id', campoId);
-
-      if (updateError) throw updateError;
-
-      // Dispara o email de aprovação via Resend
       await resend.emails.send({
-        from: 'HelloCamp Parceiros <parceiros@hellocamp.pt>', // Substitua pelo seu email verificado no Resend
+        from: 'HelloCamp Parceiros <info@hellocamp.pt>',
         to: parceiroEmail,
         subject: `[HelloCamp] Contrato Aprovado - O seu campo está online! 🎉`,
         html: `
@@ -97,13 +65,13 @@ export async function POST(req: Request) {
         `
       });
 
-      return NextResponse.json({ success: true, message: 'Contrato aprovado, campo ativado e email enviado.' });
+      return NextResponse.json({ success: true, message: 'Email de aprovação enviado.' });
     }
 
     return NextResponse.json({ error: 'Status de aprovação inválido.' }, { status: 400 });
 
   } catch (error: any) {
-    console.error('Erro na API de aprovação de contrato:', error);
+    console.error('Erro na API de emails:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

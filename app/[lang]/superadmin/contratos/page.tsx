@@ -26,7 +26,7 @@ export default function GestaoContratosHQ({ params }: { params: Promise<{ lang: 
   const fetchContratos = async () => {
     const { data } = await supabase
       .from('campos')
-      .select('id, nome, contrato_dados, status_aprovacao, taxa_comissao, ativo')
+      .select('id, nome, contrato_dados, status_aprovacao, taxa_comissao, ativo, organizador_id')
       .order('id', { ascending: false });
       
     setContratos(data || []);
@@ -45,7 +45,6 @@ export default function GestaoContratosHQ({ params }: { params: Promise<{ lang: 
   const handleAcaoContrato = async (id: string, novoStatus: string) => {
     const isApproved = novoStatus === 'Aprovado';
     
-    // A grande alteração: Garantir que se não for "Aprovado", o ativo passa a FALSE e o link do contrato é removido
     const updatePayload: any = { 
       status_aprovacao: novoStatus,
       ativo: isApproved 
@@ -57,20 +56,29 @@ export default function GestaoContratosHQ({ params }: { params: Promise<{ lang: 
       updatePayload.contrato_parceiro_url = null;
     }
 
+    // 1. Atualiza o Campo na Base de Dados
     const { error } = await supabase.from('campos').update(updatePayload).eq('id', id);
 
     if (error) {
       alert("Erro ao atualizar base de dados: " + error.message);
     } else {
+      
+      // 2. Atualiza o perfil do parceiro para Verificado (se aplicável)
+      if (modalContrato?.organizador_id) {
+        await supabase
+          .from('perfis')
+          .update({ parceiro_verificado: isApproved })
+          .eq('id', modalContrato.organizador_id);
+      }
+
+      // 3. Dispara a notificação por Email com a chave corrigida (parceiroEmail)
       try {
         const dados = modalContrato?.contrato_dados || {};
         await fetch('/api/notificacoes/status-contrato', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
-            emailParceiro: dados.emailContacto, 
-            nomeParceiro: dados.pessoaContacto,
-            empresa: dados.empresaNome,
+            parceiroEmail: dados.emailContacto, // Chave exata exigida pela API
             nomeCampo: modalContrato?.nome,
             status: novoStatus,
             lang: lang
@@ -80,7 +88,7 @@ export default function GestaoContratosHQ({ params }: { params: Promise<{ lang: 
         console.error("Erro ao notificar parceiro da alteração de estado:", err);
       }
 
-      alert(`Sucesso! Contrato alterado para ${novoStatus}. O campo está agora ${isApproved ? 'ATIVO' : 'OCULTO'} no site público.`);
+      alert(`Sucesso! Contrato alterado para ${novoStatus}. O campo está agora ${isApproved ? 'ATIVO' : 'OCULTO'}.`);
       setModalContrato((prev: any) => ({ ...prev, status_aprovacao: novoStatus, ativo: isApproved }));
       fetchContratos();
     }
@@ -108,10 +116,10 @@ export default function GestaoContratosHQ({ params }: { params: Promise<{ lang: 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          emailParceiro: editForm.emailContacto, 
-          nomeParceiro: editForm.pessoaContacto,
-          empresa: editForm.empresaNome,
-          dadosAtualizados: editForm 
+          parceiroEmail: editForm.emailContacto, 
+          nomeCampo: modalContrato?.nome,
+          status: 'Editado',
+          lang: lang
         })
       });
     } catch (err) {
@@ -598,7 +606,7 @@ export default function GestaoContratosHQ({ params }: { params: Promise<{ lang: 
                       Cancelar
                     </button>
                     <button onClick={handleGuardarEdicao} disabled={savingEdit} className="bg-blue-600 text-white font-bold px-8 py-3 rounded-xl hover:bg-blue-500 transition-transform hover:-translate-y-0.5 shadow-lg disabled:bg-slate-400 disabled:transform-none">
-                      {savingEdit ? 'A Guardar...' : 'Guardar Alterações e Notificar Parceiro'}
+                      {savingEdit ? 'A Guardar...' : 'Guardar Alterações'}
                     </button>
                   </>
                 ) : (
