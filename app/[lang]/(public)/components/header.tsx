@@ -51,16 +51,27 @@ export default function Header({ dict, lang }: { dict: any, lang: string }) {
                 <span className="text-[9px] text-gray-400 transition-transform duration-200 group-hover:rotate-180">▼</span>
               </button>
               
-              {/* O "hidden group-hover:flex" faz a mágica acontecer ao passar o rato */}
-              <div className="absolute left-1/2 -translate-x-1/2 mt-2 w-56 bg-white border border-gray-100 rounded-xl shadow-xl p-2 hidden flex-col z-50 group-hover:flex animate-in fade-in duration-150">
-                <Link href={`/${lang}/pesquisa?categoria=Aventura %26 Natureza`} className="px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-slate-50 hover:text-emerald-600 rounded-lg no-underline">
-                  🌲 {lang === 'en' ? 'Adventure & Nature' : 'Aventura & Natureza'}
+              <div className="absolute left-1/2 -translate-x-1/2 mt-2 w-64 bg-white border border-gray-100 rounded-xl shadow-xl p-2 hidden flex-col z-50 group-hover:flex animate-in fade-in duration-150">
+                <Link href={`/${lang}/pesquisa?categoria=Aventura %26 Natureza`} className="px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-slate-50 hover:text-emerald-600 rounded-lg no-underline flex items-center gap-2">
+                  <span>🌲</span> {lang === 'en' ? 'Adventure & Nature' : 'Aventura & Natureza'}
                 </Link>
-                <Link href={`/${lang}/pesquisa?categoria=Desporto`} className="px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-slate-50 hover:text-emerald-600 rounded-lg no-underline">
-                  SURF {lang === 'en' ? 'Sports' : 'Desporto'}
+                <Link href={`/${lang}/pesquisa?categoria=Desporto`} className="px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-slate-50 hover:text-emerald-600 rounded-lg no-underline flex items-center gap-2">
+                  <span>⚽</span> {lang === 'en' ? 'Sports' : 'Desporto'}
                 </Link>
-                <Link href={`/${lang}/pesquisa?categoria=Línguas`} className="px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-slate-50 hover:text-emerald-600 rounded-lg no-underline">
-                  🗣️ {lang === 'en' ? 'Languages' : 'Línguas'}
+                <Link href={`/${lang}/pesquisa?categoria=Desportos Náuticos`} className="px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-slate-50 hover:text-emerald-600 rounded-lg no-underline flex items-center gap-2">
+                  <span>🏄‍♂️</span> {lang === 'en' ? 'Water Sports' : 'Desportos Náuticos'}
+                </Link>
+                <Link href={`/${lang}/pesquisa?categoria=Artes %26 Criatividade`} className="px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-slate-50 hover:text-emerald-600 rounded-lg no-underline flex items-center gap-2">
+                  <span>🎨</span> {lang === 'en' ? 'Arts & Creativity' : 'Artes & Criatividade'}
+                </Link>
+                <Link href={`/${lang}/pesquisa?categoria=Tecnologia %26 Robótica`} className="px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-slate-50 hover:text-emerald-600 rounded-lg no-underline flex items-center gap-2">
+                  <span>💻</span> {lang === 'en' ? 'Tech & Robotics' : 'Tecnologia & Robótica'}
+                </Link>
+                <Link href={`/${lang}/pesquisa?categoria=Línguas`} className="px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-slate-50 hover:text-emerald-600 rounded-lg no-underline flex items-center gap-2">
+                  <span>🗣️</span> {lang === 'en' ? 'Languages' : 'Línguas'}
+                </Link>
+                <Link href={`/${lang}/pesquisa?categoria=Multiatividades`} className="px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-slate-50 hover:text-emerald-600 rounded-lg no-underline flex items-center gap-2">
+                  <span>🤹</span> {lang === 'en' ? 'Multi-activities' : 'Multiatividades'}
                 </Link>
               </div>
             </div>
@@ -80,7 +91,7 @@ export default function Header({ dict, lang }: { dict: any, lang: string }) {
               </div>
             </div>
 
-            {/* LINKS DIRETOS MAIS ROBUSTOS */}
+            {/* LINKS DIRETOS */}
             <Link href={`/${lang}/como_reservar`} className="text-[15px] font-bold text-gray-700 hover:text-emerald-600 no-underline py-2">
               {lang === 'en' ? 'Parents Guide' : 'Guia Pais'}
             </Link>
@@ -130,13 +141,18 @@ export default function Header({ dict, lang }: { dict: any, lang: string }) {
         {isMobileMenuOpen && (
           <div className="w-full flex flex-col bg-white border-t border-slate-100 mt-3 pt-3 pb-2 gap-2 md:hidden">
             <div className="px-2 py-1 text-[10px] font-black text-slate-400 uppercase tracking-wider">{lang === 'en' ? 'Categories' : 'Categorias'}</div>
-            <Link href={`/${lang}/pesquisa?categoria=Aventura %26 Natureza`} onClick={() => setIsMobileMenuOpen(false)} className="px-4 py-2 text-sm font-bold text-slate-700 no-underline hover:bg-slate-50">Aventura & Natureza</Link>
-            <Link href={`/${lang}/pesquisa?categoria=Desporto`} onClick={() => setIsMobileMenuOpen(false)} className="px-4 py-2 text-sm font-bold text-slate-700 no-underline hover:bg-slate-50">Desporto</Link>
-            <Link href={`/${lang}/pesquisa?categoria=Línguas`} onClick={() => setIsMobileMenuOpen(false)} className="px-4 py-2 text-sm font-bold text-slate-700 no-underline hover:bg-slate-50">Línguas</Link>
+            <Link href={`/${lang}/pesquisa?categoria=Aventura %26 Natureza`} onClick={() => setIsMobileMenuOpen(false)} className="px-4 py-2 text-sm font-bold text-slate-700 no-underline hover:bg-slate-50">🌲 Aventura & Natureza</Link>
+            <Link href={`/${lang}/pesquisa?categoria=Desporto`} onClick={() => setIsMobileMenuOpen(false)} className="px-4 py-2 text-sm font-bold text-slate-700 no-underline hover:bg-slate-50">⚽ Desporto</Link>
+            <Link href={`/${lang}/pesquisa?categoria=Desportos Náuticos`} onClick={() => setIsMobileMenuOpen(false)} className="px-4 py-2 text-sm font-bold text-slate-700 no-underline hover:bg-slate-50">🏄‍♂️ Desportos Náuticos</Link>
+            <Link href={`/${lang}/pesquisa?categoria=Artes %26 Criatividade`} onClick={() => setIsMobileMenuOpen(false)} className="px-4 py-2 text-sm font-bold text-slate-700 no-underline hover:bg-slate-50">🎨 Artes & Criatividade</Link>
+            <Link href={`/${lang}/pesquisa?categoria=Tecnologia %26 Robótica`} onClick={() => setIsMobileMenuOpen(false)} className="px-4 py-2 text-sm font-bold text-slate-700 no-underline hover:bg-slate-50">💻 Tecnologia & Robótica</Link>
+            <Link href={`/${lang}/pesquisa?categoria=Línguas`} onClick={() => setIsMobileMenuOpen(false)} className="px-4 py-2 text-sm font-bold text-slate-700 no-underline hover:bg-slate-50">🗣️ Línguas</Link>
+            <Link href={`/${lang}/pesquisa?categoria=Multiatividades`} onClick={() => setIsMobileMenuOpen(false)} className="px-4 py-2 text-sm font-bold text-slate-700 no-underline hover:bg-slate-50">🤹 Multiatividades</Link>
             
             <div className="px-2 py-1 text-[10px] font-black text-slate-400 uppercase tracking-wider mt-2">{lang === 'en' ? 'Locations' : 'Destinos'}</div>
             <Link href={`/${lang}/distrito/Lisboa`} onClick={() => setIsMobileMenuOpen(false)} className="px-4 py-2 text-sm font-bold text-slate-700 no-underline hover:bg-slate-50">Lisboa</Link>
             <Link href={`/${lang}/distrito/Porto`} onClick={() => setIsMobileMenuOpen(false)} className="px-4 py-2 text-sm font-bold text-slate-700 no-underline hover:bg-slate-50">Porto</Link>
+            <Link href={`/${lang}/distrito/Faro`} onClick={() => setIsMobileMenuOpen(false)} className="px-4 py-2 text-sm font-bold text-slate-700 no-underline hover:bg-slate-50">Faro</Link>
             
             <div className="h-px bg-slate-100 my-2"></div>
             
