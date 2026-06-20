@@ -59,9 +59,9 @@ export default function DashboardMarketing({ params }: { params: Promise<{ lang:
           tipo: 'critical', 
           icon: '🚨', 
           titulo: isEn ? 'Bank Account Not Connected' : 'Conta Bancária Não Conectada',
-          texto: isEn ? `You must connect your Stripe account to receive payments from parents.` : `Precisa de ligar a sua conta bancária via Stripe. Enquanto não o fizer, não poderá receber o dinheiro das inscrições.`, 
+          texto: isEn ? `You must connect your Stripe account to receive payments from parents.` : `Precisa de configurar a sua conta bancária via Stripe. Enquanto não o fizer, não poderá receber o dinheiro das inscrições.`, 
           link: `/${lang}/admin/faturacao`,
-          actionText: isEn ? 'Connect Now' : 'Ligar Conta Agora'
+          actionText: isEn ? 'Connect Now' : 'Configurar Conta Agora'
         });
       }
 

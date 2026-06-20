@@ -352,7 +352,7 @@ export default function EditarCampo({ params }: { params: Promise<{ lang: string
           {autoSaveStatus === 'saved' && <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#10b981' }}>✓ Guardado</span>}
           {autoSaveStatus === 'error' && <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#ef4444' }}>⚠ Erro ao gravar</span>}
           <a href={`/${lang}/campo/${id}`} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#0f172a', color: 'white', padding: '0.5rem 1.25rem', borderRadius: '999px', fontWeight: 'bold', textDecoration: 'none', fontSize: '13px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
-            👁️ Ver Campo Online
+            Ver Campo Online
           </a>
         </div>
       </div>
