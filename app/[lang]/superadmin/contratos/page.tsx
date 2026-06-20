@@ -11,10 +11,13 @@ export default function GestaoContratosHQ({ params }: { params: Promise<{ lang: 
   const [loading, setLoading] = useState(true);
   const [modalContrato, setModalContrato] = useState<any>(null);
   
+  // Filtro de Visualização
+  const [filtroStatus, setFiltroStatus] = useState<string>('Pendente de Revisão');
+  
   // Estados para Edição
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState<any>({});
-  const [editComissao, setEditComissao] = useState<number>(12); // Novo estado para a comissão
+  const [editComissao, setEditComissao] = useState<number>(12);
   const [savingEdit, setSavingEdit] = useState(false);
 
   // CLASSES DE ESTILO PARA O MODO DE EDIÇÃO
@@ -24,11 +27,10 @@ export default function GestaoContratosHQ({ params }: { params: Promise<{ lang: 
   const textareaClass = "w-full p-3 bg-white border border-slate-300 rounded-lg text-sm text-slate-800 outline-none focus:border-slate-800 focus:ring-1 focus:ring-slate-800 transition-all shadow-sm resize-y";
 
   const fetchContratos = async () => {
-    // Adicionada a taxa_comissao ao select da BD
+    // Agora removemos o '.eq' para trazer TODOS os campos e filtrar no cliente
     const { data } = await supabase
       .from('campos')
       .select('id, nome, contrato_dados, status_aprovacao, taxa_comissao')
-      .eq('status_aprovacao', 'Pendente de Revisão')
       .order('id', { ascending: false });
       
     setContratos(data || []);
@@ -40,7 +42,7 @@ export default function GestaoContratosHQ({ params }: { params: Promise<{ lang: 
   const abrirModal = (contrato: any) => {
     setModalContrato(contrato);
     setEditForm(contrato.contrato_dados || {});
-    setEditComissao(contrato.taxa_comissao || 12); // Extrai a comissão ou define 12 por defeito
+    setEditComissao(contrato.taxa_comissao || 12);
     setIsEditing(false);
   };
 
@@ -58,7 +60,8 @@ export default function GestaoContratosHQ({ params }: { params: Promise<{ lang: 
       alert("Erro ao atualizar: " + error.message);
     } else {
       alert(`Contrato ${novoStatus} com sucesso!`);
-      setModalContrato(null);
+      // Em vez de fechar o modal, apenas atualizamos o estado visualmente
+      setModalContrato((prev: any) => ({ ...prev, status_aprovacao: novoStatus }));
       fetchContratos();
     }
   };
@@ -66,7 +69,6 @@ export default function GestaoContratosHQ({ params }: { params: Promise<{ lang: 
   const handleGuardarEdicao = async () => {
     setSavingEdit(true);
     
-    // Atualiza JSON do contrato E a coluna da comissão na BD
     const { error } = await supabase
       .from('campos')
       .update({ 
@@ -104,16 +106,150 @@ export default function GestaoContratosHQ({ params }: { params: Promise<{ lang: 
     fetchContratos();
   };
 
-  if (loading) return <div className="p-12 text-center text-slate-500">A carregar contratos pendentes...</div>;
+  const handleImprimirPDF = () => {
+    if (!modalContrato || !modalContrato.contrato_dados) return;
+    const dados = modalContrato.contrato_dados;
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert("O seu navegador bloqueou a abertura da janela (Pop-up). Por favor, permita para gerar o PDF.");
+      return;
+    }
+
+    const html = `
+      <!DOCTYPE html>
+      <html lang="pt">
+      <head>
+        <meta charset="UTF-8">
+        <title>Contrato - ${dados.empresaNome || modalContrato.nome}</title>
+        <style>
+          body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #111; max-width: 800px; margin: 0 auto; padding: 40px 20px; line-height: 1.6; }
+          .header { text-align: center; margin-bottom: 40px; border-bottom: 2px solid #000; padding-bottom: 20px; }
+          .header h1 { margin: 0; font-size: 24px; text-transform: uppercase; letter-spacing: 1px; }
+          .header p { color: #555; margin: 5px 0 0 0; font-style: italic; }
+          .section { margin-bottom: 30px; }
+          .section-title { font-size: 14px; font-weight: bold; background-color: #f1f5f9; padding: 8px 12px; text-transform: uppercase; border-left: 4px solid #0f172a; margin-bottom: 15px; }
+          .grid { display: flex; flex-wrap: wrap; gap: 20px; }
+          .col { flex: 1; min-width: 300px; }
+          .data-row { margin-bottom: 8px; font-size: 14px; }
+          .data-row strong { color: #334155; }
+          .signature-box { margin-top: 50px; padding: 20px; border: 1px solid #cbd5e1; background-color: #f8fafc; border-radius: 8px; }
+          .signature-font { font-family: 'Times New Roman', Times, serif; font-size: 24px; font-style: italic; font-weight: bold; color: #065f46; margin-bottom: 5px; }
+          @media print { body { padding: 0; } .print-hide { display: none; } }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>Acordo de Intermediação HelloCamp</h1>
+          <p>Documento de vinculação B2B gerado digitalmente</p>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Informação do Programa e Comissão</div>
+          <div class="data-row"><strong>Nome do Campo/Programa:</strong> ${modalContrato.nome}</div>
+          <div class="data-row"><strong>ID Interno:</strong> ${modalContrato.id}</div>
+          <div class="data-row"><strong>Comissão Acordada:</strong> ${modalContrato.taxa_comissao || 12}%</div>
+          <div class="data-row"><strong>Data de Submissão:</strong> ${dados.dataSubmissao ? new Date(dados.dataSubmissao).toLocaleString('pt-PT') : 'N/D'}</div>
+          <div class="data-row"><strong>Estado da Aprovação:</strong> ${modalContrato.status_aprovacao}</div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Dados Fiscais da Entidade Parceira</div>
+          <div class="grid">
+            <div class="col">
+              <div class="data-row"><strong>Empresa (Faturação):</strong> ${dados.empresaNome}</div>
+              <div class="data-row"><strong>Forma Jurídica:</strong> ${dados.formaJuridica}</div>
+              <div class="data-row"><strong>NIF:</strong> ${dados.nif}</div>
+            </div>
+            <div class="col">
+              <div class="data-row"><strong>Morada:</strong> ${dados.morada}</div>
+              <div class="data-row"><strong>Código Postal:</strong> ${dados.codigoPostal}</div>
+              <div class="data-row"><strong>Website:</strong> ${dados.website || 'N/A'}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Pontos de Contacto Oficiais</div>
+          <div class="grid">
+            <div class="col">
+              <div class="data-row"><strong>Responsável:</strong> ${dados.pessoaContacto}</div>
+              <div class="data-row"><strong>Telefone:</strong> ${dados.telefone}</div>
+              <div class="data-row"><strong>Responsável RGPD:</strong> ${dados.responsavelRGPD}</div>
+            </div>
+            <div class="col">
+              <div class="data-row"><strong>E-mail Comercial:</strong> ${dados.emailContacto}</div>
+              <div class="data-row"><strong>E-mail Reservas:</strong> ${dados.emailReservas}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Condições Operacionais (Anexos)</div>
+          <div class="data-row"><strong>Gestão de Reservas:</strong> ${dados.modalidadeReserva === 'direta' ? 'Reserva Direta (Automático)' : 'Sob Consulta (E-mail)'}</div>
+          <div class="data-row"><strong>Modelo de Pagamento:</strong> ${dados.tipoPagamento === '100_total' ? '100% no Ato da Reserva' : 'Sinal de 50% + Restante'}</div>
+          <div class="data-row"><strong>Política de Cancelamento:</strong> ${dados.politicaCancelamento}</div>
+          <div class="data-row" style="margin-top:15px;"><strong>Acordos Complementares / Exceções:</strong></div>
+          <div style="background-color: #f8fafc; padding: 10px; font-style: italic; font-size: 13px; border: 1px solid #e2e8f0;">
+            ${dados.acordosComplementares || 'Nenhuma cláusula de exceção definida ou preenchida pelo parceiro.'}
+          </div>
+        </div>
+
+        <div class="signature-box">
+          <div style="font-size: 11px; text-transform: uppercase; font-weight: bold; color: #64748b; margin-bottom: 10px;">Assinatura Digital de Vinculação Legal</div>
+          <div class="signature-font">${dados.assinaturaNome}</div>
+          <div class="data-row" style="color: #475569;">Cargo Declarado: ${dados.assinaturaCargo}</div>
+          <div class="data-row" style="font-size: 11px; color: #94a3b8; margin-top: 15px; border-top: 1px solid #e2e8f0; padding-top: 10px;">
+            Registado digitalmente via: ${dados.ipAssinatura} | Timestamp: ${dados.dataSubmissao}
+          </div>
+        </div>
+
+        <div class="print-hide" style="text-align: center; margin-top: 40px;">
+          <button onclick="window.print()" style="padding: 10px 20px; background-color: #0f172a; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 16px;">Guardar PDF / Imprimir</button>
+        </div>
+      </body>
+      </html>
+    `;
+    printWindow.document.write(html);
+    printWindow.document.close();
+    // Pequeno atraso para garantir que os estilos carregam antes do diálogo de impressão
+    setTimeout(() => {
+      printWindow.print();
+    }, 250);
+  };
+
+  const tabs = ['Pendente de Revisão', 'Aprovado', 'Rejeitado', 'Todos'];
+  const contratosFiltrados = contratos.filter(c => filtroStatus === 'Todos' || c.status_aprovacao === filtroStatus);
+
+  if (loading) return <div className="p-12 text-center text-slate-500 font-bold animate-pulse">A carregar registos da base de dados...</div>;
 
   return (
     <div className="p-8 font-sans">
-      <h1 className="text-3xl font-black mb-2 text-slate-900">Validação de Contratos</h1>
-      <p className="text-slate-500 mb-8">Reveja, edite e aprove os acordos de intermediação submetidos pelos parceiros.</p>
+      <h1 className="text-3xl font-black mb-2 text-slate-900">Gestão Global de Contratos</h1>
+      <p className="text-slate-500 mb-8">Administre todo o histórico de acordos de intermediação B2B da plataforma.</p>
 
-      {contratos.length === 0 ? (
+      {/* TABS DE FILTRAGEM */}
+      <div className="flex flex-wrap gap-2 mb-6 border-b border-slate-200 pb-4">
+        {tabs.map(tab => {
+          const count = contratos.filter(c => tab === 'Todos' ? true : c.status_aprovacao === tab).length;
+          return (
+            <button 
+              key={tab}
+              onClick={() => setFiltroStatus(tab)}
+              className={`px-4 py-2 rounded-full text-sm font-bold transition-colors ${
+                filtroStatus === tab 
+                  ? 'bg-slate-900 text-white shadow-md' 
+                  : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              {tab} <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${filtroStatus === tab ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-500'}`}>{count}</span>
+            </button>
+          )
+        })}
+      </div>
+
+      {contratosFiltrados.length === 0 ? (
         <div className="bg-slate-50 border border-slate-200 rounded-xl p-12 text-center text-slate-500 font-bold">
-          Não existem contratos pendentes de revisão.
+          Não existem contratos para o filtro selecionado.
         </div>
       ) : (
         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
@@ -123,22 +259,36 @@ export default function GestaoContratosHQ({ params }: { params: Promise<{ lang: 
                 <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Campo</th>
                 <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Entidade</th>
                 <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Comissão</th>
-                <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Data</th>
+                <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Estado</th>
                 <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Ações</th>
               </tr>
             </thead>
             <tbody>
-              {contratos.map(c => {
+              {contratosFiltrados.map(c => {
                 const dados = c.contrato_dados || {};
+                
+                // Define as cores baseadas no status
+                let statusColor = "bg-slate-100 text-slate-600";
+                if (c.status_aprovacao === 'Aprovado') statusColor = "bg-emerald-100 text-emerald-800 border border-emerald-200";
+                if (c.status_aprovacao === 'Rejeitado') statusColor = "bg-red-100 text-red-800 border border-red-200";
+                if (c.status_aprovacao === 'Pendente de Revisão') statusColor = "bg-amber-100 text-amber-800 border border-amber-200";
+
                 return (
                   <tr key={c.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
                     <td className="p-4 font-bold text-slate-900">{c.nome}</td>
-                    <td className="p-4 text-sm text-slate-600">{dados.empresaNome || 'N/D'}</td>
-                    <td className="p-4 text-sm font-bold text-emerald-600">{c.taxa_comissao || 12}%</td>
-                    <td className="p-4 text-sm text-slate-600">{dados.dataSubmissao ? new Date(dados.dataSubmissao).toLocaleDateString('pt-PT') : 'N/D'}</td>
+                    <td className="p-4 text-sm text-slate-600">
+                      {dados.empresaNome || 'N/D'}
+                      <div className="text-[10px] text-slate-400 mt-1">{dados.dataSubmissao ? new Date(dados.dataSubmissao).toLocaleDateString('pt-PT') : ''}</div>
+                    </td>
+                    <td className="p-4 text-sm font-bold text-slate-700">{c.taxa_comissao || 12}%</td>
+                    <td className="p-4">
+                      <span className={`text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full ${statusColor}`}>
+                        {c.status_aprovacao}
+                      </span>
+                    </td>
                     <td className="p-4">
                       <button onClick={() => abrirModal(c)} className="bg-slate-900 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-slate-800 transition-colors shadow-sm">
-                        Rever Documento
+                        Ver Detalhes
                       </button>
                     </td>
                   </tr>
@@ -153,21 +303,42 @@ export default function GestaoContratosHQ({ params }: { params: Promise<{ lang: 
       {modalContrato && (
         <div className="fixed inset-0 bg-slate-900/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-white w-full max-w-4xl max-h-[90vh] rounded-2xl flex flex-col overflow-hidden shadow-2xl">
+            
+            {/* CABEÇALHO DO MODAL */}
             <div className="p-6 border-b border-slate-200 flex justify-between items-center bg-slate-50">
               <div>
                 <h2 className="text-xl font-black text-slate-900 flex items-center gap-3">
                   {modalContrato.nome}
                   {isEditing && <span className="bg-[#EBA914] text-white text-[10px] uppercase tracking-widest font-black px-2.5 py-1 rounded-full shadow-sm">Modo de Edição</span>}
+                  {!isEditing && (
+                    <span className={`text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full border ${
+                      modalContrato.status_aprovacao === 'Aprovado' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' :
+                      modalContrato.status_aprovacao === 'Rejeitado' ? 'bg-red-100 text-red-800 border-red-200' :
+                      'bg-amber-100 text-amber-800 border-amber-200'
+                    }`}>
+                      {modalContrato.status_aprovacao}
+                    </span>
+                  )}
                 </h2>
                 <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">ID do Campo: {modalContrato.id}</p>
               </div>
-              <div className="flex items-center gap-4">
+              
+              <div className="flex items-center gap-3 sm:gap-4">
+                {/* BOTÃO DE PDF */}
+                <button onClick={handleImprimirPDF} className="text-sm font-bold text-slate-600 hover:text-slate-900 flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-lg border border-slate-200 transition-colors shadow-sm">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                  <span className="hidden sm:inline">PDF</span>
+                </button>
+
+                {/* BOTÃO DE EDITAR */}
                 {!isEditing && (
-                  <button onClick={() => setIsEditing(true)} className="text-sm font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100 transition-colors">
-                    ✏️ Editar Contrato
+                  <button onClick={() => setIsEditing(true)} className="text-sm font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1.5 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100 transition-colors">
+                    ✏️ <span className="hidden sm:inline">Editar</span>
                   </button>
                 )}
-                <button onClick={() => setModalContrato(null)} className="text-3xl font-bold text-slate-400 hover:text-slate-900 leading-none">&times;</button>
+                
+                {/* BOTÃO FECHAR */}
+                <button onClick={() => setModalContrato(null)} className="text-3xl font-bold text-slate-400 hover:text-slate-900 leading-none ml-2">&times;</button>
               </div>
             </div>
             
@@ -321,26 +492,40 @@ export default function GestaoContratosHQ({ params }: { params: Promise<{ lang: 
               </div>
             </div>
 
-            <div className="p-6 border-t border-slate-200 bg-slate-50 flex gap-4 justify-end items-center">
-              {isEditing ? (
-                <>
-                  <button onClick={() => setIsEditing(false)} className="bg-white border border-slate-300 text-slate-600 font-bold px-6 py-3 rounded-xl hover:bg-slate-100 transition-colors">
-                    Cancelar
+            <div className="p-6 border-t border-slate-200 bg-slate-50 flex flex-wrap gap-4 justify-between items-center">
+              <div>
+                {!isEditing && modalContrato.status_aprovacao !== 'Pendente de Revisão' && (
+                  <button onClick={() => handleAcaoContrato(modalContrato.id, 'Pendente de Revisão')} className="text-sm font-bold text-slate-500 hover:text-slate-800 underline">
+                    Reverter para Pendente
                   </button>
-                  <button onClick={handleGuardarEdicao} disabled={savingEdit} className="bg-blue-600 text-white font-bold px-8 py-3 rounded-xl hover:bg-blue-500 transition-transform hover:-translate-y-0.5 shadow-lg disabled:bg-slate-400 disabled:transform-none">
-                    {savingEdit ? 'A Guardar...' : 'Guardar Alterações e Notificar Parceiro'}
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button onClick={() => handleAcaoContrato(modalContrato.id, 'Rejeitado')} className="bg-white border border-red-200 text-red-600 font-bold px-6 py-3 rounded-xl hover:bg-red-50 transition-colors">
-                    Rejeitar Parceiro
-                  </button>
-                  <button onClick={() => handleAcaoContrato(modalContrato.id, 'Aprovado')} className="bg-emerald-600 text-white font-bold px-8 py-3 rounded-xl hover:bg-emerald-500 transition-transform hover:-translate-y-0.5 shadow-lg">
-                    Validar e Aprovar Contrato
-                  </button>
-                </>
-              )}
+                )}
+              </div>
+              
+              <div className="flex gap-4">
+                {isEditing ? (
+                  <>
+                    <button onClick={() => setIsEditing(false)} className="bg-white border border-slate-300 text-slate-600 font-bold px-6 py-3 rounded-xl hover:bg-slate-100 transition-colors">
+                      Cancelar
+                    </button>
+                    <button onClick={handleGuardarEdicao} disabled={savingEdit} className="bg-blue-600 text-white font-bold px-8 py-3 rounded-xl hover:bg-blue-500 transition-transform hover:-translate-y-0.5 shadow-lg disabled:bg-slate-400 disabled:transform-none">
+                      {savingEdit ? 'A Guardar...' : 'Guardar Alterações e Notificar Parceiro'}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    {modalContrato.status_aprovacao !== 'Rejeitado' && (
+                      <button onClick={() => handleAcaoContrato(modalContrato.id, 'Rejeitado')} className="bg-white border border-red-200 text-red-600 font-bold px-6 py-3 rounded-xl hover:bg-red-50 transition-colors">
+                        Rejeitar Parceiro
+                      </button>
+                    )}
+                    {modalContrato.status_aprovacao !== 'Aprovado' && (
+                      <button onClick={() => handleAcaoContrato(modalContrato.id, 'Aprovado')} className="bg-emerald-600 text-white font-bold px-8 py-3 rounded-xl hover:bg-emerald-500 transition-transform hover:-translate-y-0.5 shadow-lg">
+                        Validar e Aprovar Contrato
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>
