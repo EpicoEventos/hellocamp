@@ -1,15 +1,14 @@
 import { NextResponse } from 'next/server';
+import { Resend } from 'resend';
 
 export const dynamic = 'force-dynamic';
+
+// Inicializa o Resend com a chave do seu ficheiro .env
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(req: Request) {
   try {
     const { form, emailAcesso, lang } = await req.json();
-    const apiKey = process.env.BREVO_API_KEY;
-
-    if (!apiKey) {
-      throw new Error("A chave API da Brevo não está configurada.");
-    }
 
     const isEn = lang === 'en';
 
@@ -66,36 +65,30 @@ export async function POST(req: Request) {
       </div>
     `;
 
-    // Disparar os dois e-mails ao mesmo tempo para não atrasar a resposta
+    const remetenteOficial = 'HelloCamp Sistema <info@hellocamp.pt>';
+
+    // Disparar os dois e-mails ao mesmo tempo utilizando o Resend
     await Promise.all([
-      // Email para a HelloCamp
-      fetch('https://api.brevo.com/v3/smtp/email', {
-        method: 'POST',
-        headers: { 'api-key': apiKey, 'content-type': 'application/json', 'accept': 'application/json' },
-        body: JSON.stringify({
-          sender: { name: 'Sistema HelloCamp', email: 'info@hellocamp.pt' },
-          to: [{ email: 'info@hellocamp.pt', name: 'Equipa HelloCamp' }],
-          subject: `Novo Parceiro: ${form.nomeEmpresa}`,
-          htmlContent: adminHtml,
-        })
+      // Email para a equipa HelloCamp (Admin)
+      resend.emails.send({
+        from: remetenteOficial,
+        to: 'info@hellocamp.pt',
+        subject: `Novo Parceiro: ${form.nomeEmpresa}`,
+        html: adminHtml,
       }),
       // Email para o Parceiro
-      fetch('https://api.brevo.com/v3/smtp/email', {
-        method: 'POST',
-        headers: { 'api-key': apiKey, 'content-type': 'application/json', 'accept': 'application/json' },
-        body: JSON.stringify({
-          sender: { name: 'Equipa HelloCamp', email: 'info@hellocamp.pt' },
-          to: [{ email: emailAcesso, name: form.pessoaContacto }],
-          subject: parceiroSubject,
-          htmlContent: parceiroHtml,
-        })
+      resend.emails.send({
+        from: remetenteOficial,
+        to: emailAcesso,
+        subject: parceiroSubject,
+        html: parceiroHtml,
       })
     ]);
 
     return NextResponse.json({ success: true });
 
   } catch (error: any) {
-    console.error("Erro ao enviar emails de novo contrato:", error);
+    console.error("Erro ao enviar emails de novo contrato via Resend:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
